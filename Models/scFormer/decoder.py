@@ -169,4 +169,6 @@ class Decoders(nn.Module):
 
         if self.do_dab:
             output["dab_output"] = self.grad_reverse_discriminator(cell_emb)
+        
+        return output
 
