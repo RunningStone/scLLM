@@ -1,6 +1,7 @@
 import torch.nn as nn
 from typing import Callable
 class scBERT_para:
+    model_name:str = "scBERT"                   # model name
     #----> paras for create model architecture
     num_tokens:int=None                         # num of tokens
     max_seq_len:int=None                        # max length of sequence
