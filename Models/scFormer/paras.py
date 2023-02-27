@@ -1,5 +1,7 @@
 from typing import Any, Optional, Union
+import attr
 
+@attr.s(auto_attribs=True)
 class scFormer_para:
     model_name: str = "scFormer"
     # need to set when init

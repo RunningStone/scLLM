@@ -1,5 +1,8 @@
 import torch.nn as nn
 from typing import Callable
+import attr
+
+@attr.s(auto_attribs=True)
 class scBERT_para:
     model_name:str = "scBERT"                   # model name
     #----> paras for create model architecture
