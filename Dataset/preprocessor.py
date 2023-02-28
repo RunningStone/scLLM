@@ -344,8 +344,8 @@ class Preprocessor:
                 if binarize == "equal_width":
                     bins = np.linspace(bin_min, bin_max, bin_nb)
                 elif binarize == "equal_instance":
-                    c_label = np.sort(original_label.flatten())
-                    bins = np.array([ c_label[int(((len(c_label)-1)/bin_nb)*i)] for i in range(bin_nb+1)])
+                    c_label = np.sort(original_label.to_numpy().flatten())
+                    bins = np.array([ c_label[int(((len(c_label)-1)/bin_nb)*i)] for i in range(bin_nb)])
             bin_names = np.arange(bin_nb)
             digitized = np.digitize(original_label, bins)
             binned_label = bin_names[digitized-1]
