@@ -96,5 +96,5 @@ class PerformerLM(nn.Module):
             if exists(self.to_out):
                 x = self.to_out(x)
                 return x
-
+            #@ means matrix multiplication __matmul__()
             return x @ self.token_emb.weight.t()

@@ -302,7 +302,7 @@ class Preprocessor:
     def to_label(self,
                 label_key: str, 
                 #----> for binarize label
-                binarize:bool=False,
+                binarize:str=None,
                 bins:np.ndarray=None,
                 bin_nb: int=None,bin_min:float=None,bin_max:float=None,
                 save_in_obs:bool=True,
@@ -315,7 +315,7 @@ class Preprocessor:
         Args:
             label_key (:class:`str`):
                 The key of :class:`AnnData.obs` to use as label
-            binarize (:class:`bool`)(optional):
+            binarize (:class:`str`)(optional): ["quantile",""]
                 If True, we will binarize the label
             bins (:class:`np.ndarray`)(optional):
                 The bins to binarize the label
@@ -335,12 +335,17 @@ class Preprocessor:
         """
         logger.info(f"Binarize label {label_key} in obs_names")
         original_label = self.adata.obs[label_key] 
-        if binarize:
+        if binarize is not None:
+            assert binarize in ["equal_width","equal_instance"]
             if bins is None:
                 assert bin_nb is not None 
                 if bin_min is None: bin_min = original_label.min()
                 if bin_max is None: bin_max = original_label.max()
-                bins = np.linspace(bin_min, bin_max, bin_nb)
+                if binarize == "equal_width":
+                    bins = np.linspace(bin_min, bin_max, bin_nb)
+                elif binarize == "equal_instance":
+                    c_label = np.sort(original_label.flatten())
+                    bins = np.array([ c_label[int(((len(c_label)-1)/bin_nb)*i)] for i in range(bin_nb+1)])
             bin_names = np.arange(bin_nb)
             digitized = np.digitize(original_label, bins)
             binned_label = bin_names[digitized-1]
@@ -356,7 +361,7 @@ class Preprocessor:
         label = torch.from_numpy(np_label).unsqueeze(1)
         return label,class_weight
     
-    def to_dataloader(self,dataset:Dataset):
+    def to_dataloader(self,dataset:Dataset,sampler:Optional[torch.utils.data.Sampler]=None):
         """
         Get dataloader from dataset
         Args:
@@ -364,6 +369,9 @@ class Preprocessor:
         Returns:
             dataloader
         """
+        if sampler is not None:
+            self.para.shuffle = False
+            self.para.additional_dataloader_para["sampler"] = sampler
         dataloader = DataLoader(dataset, 
                                 batch_size=self.para.batch_size, 
                                 shuffle=self.para.shuffle, 
