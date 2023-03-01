@@ -14,6 +14,7 @@ from scanpy.get import _get_obs_rep, _set_obs_rep
 from anndata import AnnData
 
 from scLLM.Dataset.paras import Dataset_para
+from scLLM.Trainer.paras import Trainer_para
 from scLLM import logger
 
 class Preprocessor:
@@ -25,6 +26,7 @@ class Preprocessor:
     def __init__(
         self,
         dataset_para: Dataset_para,
+        trainer_para: Optional[Trainer_para] = None,
     ):
         r"""
         Set up the preprocessor, use the args to config the workflow steps.
@@ -32,6 +34,7 @@ class Preprocessor:
         logger.info("Initializing preprocessor ...")
         #logger.debug(f"dataset_para: {dataset_para}")
         self.para = dataset_para
+        self.trainer_para = trainer_para 
         self.adata = None
 
     def load_adata(self, loc:str):
@@ -369,14 +372,15 @@ class Preprocessor:
         Returns:
             dataloader
         """
+        assert self.trainer_para is not None, "trainer_para is None, please set it first"
         if sampler is not None:
-            self.para.shuffle = False
-            self.para.additional_dataloader_para["sampler"] = sampler
+            self.trainer_para.shuffle = False
+            self.trainer_para.additional_dataloader_para["sampler"] = sampler
         dataloader = DataLoader(dataset, 
-                                batch_size=self.para.batch_size, 
-                                shuffle=self.para.shuffle, 
-                                num_workers=self.para.num_workers,
-                                **self.para.additional_dataloader_para,
+                                batch_size=self.trainer_para.batch_size, 
+                                shuffle=self.trainer_para.shuffle, 
+                                num_workers=self.trainer_para.num_workers,
+                                **self.trainer_para.additional_dataloader_para,
                                 )
         return dataloader
 

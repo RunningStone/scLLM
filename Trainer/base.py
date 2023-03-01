@@ -8,7 +8,7 @@ from scLLM.Trainer.paras import Trainer_para
 from scLLM import logger
 class pl_basic(pl.LightningModule):
     def __init__(self,
-                 trainer_paras:Trainer_para,# trainer para
+                trainer_paras:Trainer_para,# trainer para
                 model_paras, # model para
                 ):
         super(pl_basic,self).__init__()
@@ -127,7 +127,7 @@ class pl_basic(pl.LightningModule):
                                 max_epochs=self.trainer_paras.max_epochs,
                                 **trainer_additional_dict
                                 )
-        self.logger.info(f"trainer is built.")
+        logger.info(f"trainer is built.")
     #########################################################################
     #   need to customize for different algorithms
     #########################################################################

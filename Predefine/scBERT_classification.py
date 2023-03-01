@@ -25,7 +25,6 @@ trainer_para.num_workers =0
 trainer_para.additional_dataloader_para = {}
 #-----> model
 trainer_para.model_name: str = "scBERT" #"scFormer","scBERT"
-trainer_para.ckpt_loc: str = None   # checkpoint file location
 trainer_para.pre_trained:str = None # pre-trained ckpt location
 
 #-----> optimizer and loss

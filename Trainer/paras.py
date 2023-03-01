@@ -19,7 +19,7 @@ class Trainer_para:
     additional_dataloader_para: dict = {}
     #-----> model
     model_name: str = None #"scFormer","scBERT"
-    ckpt_loc: str = None   # checkpoint file location
+    ckpt_folder:str = None   # checkpoint file location
     pre_trained:str = None # pre-trained ckpt location
 
     #-----> optimizer and loss
@@ -57,7 +57,7 @@ class Trainer_para:
     wandb_api_key:str = None # wandb api key
 
     save_ckpt:bool = True # save checkpoint or not
-    ckpt_folder:str = None
+    
     #debug: try to add formated name to ckpt
     ckpt_format:str = "_{epoch:02d}-{auroc:.2f}" # check_point format 
     ckpt_para = { #-----------> paras for pytorch_lightning.callbacks.ModelCheckpoint
