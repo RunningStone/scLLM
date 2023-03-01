@@ -14,10 +14,13 @@ class Trainer_para:
     task_type: str = None # "classification","regression"
     class_nb: int = None # number of classes
     batch_size: int = 4 # batch size
-
+    shuffle: bool = True
+    num_workers:int = 8
+    additional_dataloader_para: dict = {}
     #-----> model
     model_name: str = None #"scFormer","scBERT"
     ckpt_loc: str = None   # checkpoint file location
+    pre_trained:str = None # pre-trained ckpt location
 
     #-----> optimizer and loss
     optimizers:list = [torch.optim.Adam,

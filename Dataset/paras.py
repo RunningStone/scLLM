@@ -48,9 +48,4 @@ class Dataset_para:
     preprocessed_loc: str = None
 
     #--------> dataset steps
-
-    #--------> dataloader steps
-    batch_size: int = 32
-    shuffle:bool =True
-    num_workers:int =0
-    additional_dataloader_para:dict = {}
+    # how to split dataset
