@@ -37,12 +37,44 @@ class Preprocessor:
         self.trainer_para = trainer_para 
         self.adata = None
 
-    def load_adata(self, loc:str):
+    def load_adata(self, loc:str, translate:bool=False, var_idx:str=None,obs_idx:str=None):
         """
         Load data from anndata object
+        Args:
+            loc: anndata object location
+            translate: if True, translate anndata from other source into scLLM format
+            var_idx: if translate is True, var_idx is the name of gene name colume in anndata.var object
+            obs_idx: if translate is True, obs_idx is the name of label colume in anndata.obs object
         """
         logger.info(f"Load data from anndata object.")
         self.adata = sc.read_h5ad(loc)
+        if translate:
+            assert var_idx is not None, "var_idx is None"
+            assert obs_idx is not None, "obs_idx is None"
+            vocab = self.para.gene_vocab
+            counts = lil_matrix((self.adata.shape[0],len(vocab)),dtype=np.float32)
+            logger.debug(f"create sparse matrix with shape:{counts.shape}")
+            gene_list = self.adata.var[var_idx].to_list()
+            logger.debug(f"In original adata with gene {len(gene_list)}")
+            for i in range(len(vocab)):
+                if i % 2000 == 0: logger.debug(f"processing {i}/{len(vocab)}")
+                if vocab[i] in gene_list:
+                    mask = (self.adata.var[var_idx]==vocab[i])
+                    if mask.to_list().count(True) > 1:
+                        logger.warn(f"gene {vocab[i]} has more than one columes, mix them up with mean()")
+                        counts[:,i] = self.adata.X[:,mask].mean(axis=1)
+                    else:
+                        counts[:,i] = self.adata.X[:,mask]
+            counts = counts.tocsr()
+            obs = self.adata.obs[obs_idx].to_frame() # can only accept dataframe
+            logger.info(f"create anndata in scLLM format..")
+            new = ad.AnnData(X=counts)
+            new.var_names = vocab
+            new.obs = obs
+            new.obs_names = self.adata.obs_names
+            logger.debug(f"restore anndata in scLLM format..")
+            self.adata = new
+            logger.info(f"Done.")
    
     def save_adata(self, loc:str):
         """
