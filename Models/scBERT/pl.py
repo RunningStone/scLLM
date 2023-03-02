@@ -89,7 +89,7 @@ class pl_scBERT(pl_basic):
         #----> log part
         self.log(bar_name, self.bar_metrics(probs, target.squeeze()), 
                             prog_bar=True, on_epoch=True, logger=True)
-        self.log_dict(self.valid_metrics(max_probs.squeeze() , target.squeeze()),
+        self.log_dict(self.train_metrics(max_probs.squeeze() , target.squeeze()),
                           on_epoch = True, logger = True)    
 
 

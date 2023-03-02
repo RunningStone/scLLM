@@ -191,7 +191,7 @@ class pl_basic(pl.LightningModule):
         #----> log part
         self.log(bar_name, self.bar_metrics(probs, target.squeeze()), 
                             prog_bar=True, on_epoch=True, logger=True)
-        self.log_dict(self.valid_metrics(max_probs.squeeze() , target.squeeze()),
+        self.log_dict(self.train_metrics(max_probs.squeeze() , target.squeeze()),
                           on_epoch = True, logger = True)    
     #-----> define for each algorithm
 
@@ -214,7 +214,7 @@ class pl_basic(pl.LightningModule):
 
     def training_epoch_end(self, training_step_outputs):
         self.log_train_metrics(training_step_outputs,
-            bar_name = self.trainer_paras.metrics_factory.metrics_names[0])
+            bar_name = self.trainer_paras.metrics_factory.metrics_names[0]+"_train")
 
     def validation_step(self, batch, batch_idx):
         #---->data preprocess
@@ -233,5 +233,5 @@ class pl_basic(pl.LightningModule):
     
     def validation_epoch_end(self, validation_step_outputs):
         self.log_val_metrics(validation_step_outputs,
-            bar_name = self.trainer_paras.metrics_factory.metrics_names[0])
+            bar_name = self.trainer_paras.metrics_factory.metrics_names[0]+"_val")
 

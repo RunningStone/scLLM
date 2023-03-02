@@ -72,11 +72,7 @@ class scFormer(nn.Module):
         """
         self.decoder.set_output(CLS,CCE,MVC,ECS,do_sample)
 
-    def forward(self,
-                src: Tensor,
-                values: Tensor,
-                src_key_padding_mask: Tensor,
-                batch_labels: Optional[Tensor] = None):
+    def forward(self,data):
         """
         Args:
             src (:obj:`Tensor`): token ids, shape [batch_size, seq_len]
@@ -87,6 +83,7 @@ class scFormer(nn.Module):
         Returns:
             dict of output Tensors.
         """
+        (src, values, src_key_padding_mask, batch_labels) = data
         # encoder
         encoder_output,src_key_padding_mask, batch_emb = self.encoder(src, values, src_key_padding_mask, batch_labels)
         # transformer
