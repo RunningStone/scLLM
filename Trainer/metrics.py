@@ -10,8 +10,10 @@ metrics_dict = {
 
     "auroc": torchmetrics.AUROC,
     "roc": torchmetrics.ROC,
+    "confusion_matrix": torchmetrics.ConfusionMatrix,
 }
-metrics_para_dict = {
+# older version of torchmetrics 
+metrics_para_dict_old = {
 "classification":{
     "accuracy": {"average": "micro"},
     "cohen_kappa": {},
@@ -22,8 +24,28 @@ metrics_para_dict = {
 
     "auroc": {"average": "macro"},
     "roc": {"average": "macro"},
+    "confusion_matrix": {"normalize": "true"},
 },
 }
+metrics_para_dict_new= {
+"classification":{
+    "accuracy": {"task":'multiclass',"average": "micro"},
+    "cohen_kappa": {"task":'multiclass',},
+    "f1_score": {"task":'multiclass',"average": "macro"},
+    "recall": {"task":'multiclass',"average": "macro"},
+    "precision": {"task":'multiclass',"average": "macro"},
+    "specificity": {"task":'multiclass',"average": "macro"},
+
+    "auroc": {"task":'multiclass',"average": "macro"},
+    "roc": {"task":'multiclass',"average": "macro"},
+    "confusion_matrix": {"task":'multiclass',"normalize": "true"},
+},
+}
+# make sure it work for older version and new version
+if int(torchmetrics.__version__.split(".")[1])>=11:
+    metrics_para_dict = metrics_para_dict_new
+else:
+    metrics_para_dict = metrics_para_dict_old
 
 
 class MetricsFactory:
