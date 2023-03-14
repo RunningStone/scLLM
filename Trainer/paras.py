@@ -59,12 +59,12 @@ class Trainer_para:
     save_ckpt:bool = True # save checkpoint or not
     
     #debug: try to add formated name to ckpt
-    ckpt_format:str = "_{epoch:02d}-{auroc:.2f}" # check_point format 
+    ckpt_format:str = "_{epoch:02d}-{accuracy_val:.2f}" # check_point format 
     ckpt_para = { #-----------> paras for pytorch_lightning.callbacks.ModelCheckpoint
                     "save_top_k":1,
-                   "monitor":"auroc",}
+                   "monitor":"accuracy_val",}
     
-
+    
     #-----> functions
     def init_opts_and_schs(self):
         """
