@@ -62,6 +62,7 @@ class Trainer_para:
     ckpt_format:str = "_{epoch:02d}-{accuracy_val:.2f}" # check_point format 
     ckpt_para = { #-----------> paras for pytorch_lightning.callbacks.ModelCheckpoint
                     "save_top_k":1,
+                    "mode":"max",
                    "monitor":"accuracy_val",}
     
     
