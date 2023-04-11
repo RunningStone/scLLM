@@ -3,9 +3,10 @@ import torch.nn as nn
 from torch import Tensor
 from typing import  Union, Dict
 
-from scLLM.Modules.reversible import grad_reverse
+from scLLM.Modules.sequence.reversible import grad_reverse
+from scLLM.Modules.layers.base import BaseLayers
 
-class ClsDecoder(nn.Module):
+class ClsDecoder(BaseLayers):
     """
     Decoder for classification task.
     """
@@ -16,15 +17,16 @@ class ClsDecoder(nn.Module):
         n_cls: int,
         nlayers: int = 3,
         activation: callable = nn.ReLU,
+        **kwargs,
     ):
-        super().__init__()
+        super().__init__(**kwargs)
         # module list
-        self._decoder = nn.ModuleList()
+        self._decoder = self.ops.ModuleList()
         for i in range(nlayers - 1):
-            self._decoder.append(nn.Linear(d_model, d_model))
+            self._decoder.append(self.ops.Linear(d_model, d_model))
             self._decoder.append(activation())
-            self._decoder.append(nn.LayerNorm(d_model))
-        self.out_layer = nn.Linear(d_model, n_cls)
+            self._decoder.append(self.ops.LayerNorm(d_model))
+        self.out_layer = self.ops.Linear(d_model, n_cls)
 
     def forward(self, x: Tensor) -> Tensor:
         """
@@ -36,7 +38,7 @@ class ClsDecoder(nn.Module):
         return self.out_layer(x)
 
 
-class MVCDecoder(nn.Module):
+class MVCDecoder(BaseLayers):
     """
     Decoder for the masked value prediction for cell embeddings.
 
@@ -68,6 +70,7 @@ class MVCDecoder(nn.Module):
         hidden_activation: nn.Module = nn.PReLU,
         explicit_zero_prob: bool = False,
         use_batch_labels: bool = False,
+        **kwargs,
     ) -> None:
         """
         Args:
@@ -79,26 +82,26 @@ class MVCDecoder(nn.Module):
             hidden_activation (:obj:`nn.Module`): activation function for the hidden
                 layers.
         """
-        super().__init__()
+        super().__init__(**kwargs)
         d_in = d_model * 2 if use_batch_labels else d_model
         if arch_style in ["inner product", "inner product, detach"]:
-            self.gene2query = nn.Linear(d_model, d_model)
+            self.gene2query = self.ops.Linear(d_model, d_model)
             self.query_activation = query_activation()
-            self.W = nn.Linear(d_model, d_in, bias=False)
+            self.W = self.ops.Linear(d_model, d_in, bias=False)
             if explicit_zero_prob:  # by default, gene-wise prob rate
-                self.W_zero_logit = nn.Linear(d_model, d_in)
+                self.W_zero_logit = self.ops.Linear(d_model, d_in)
         elif arch_style == "concat query":
-            self.gene2query = nn.Linear(d_model, 64)
+            self.gene2query = self.ops.Linear(d_model, 64)
             self.query_activation = query_activation()
-            self.fc1 = nn.Linear(d_model + 64, 64)
+            self.fc1 = self.ops.Linear(d_model + 64, 64)
             self.hidden_activation = hidden_activation()
-            self.fc2 = nn.Linear(64, 1)
+            self.fc2 = self.ops.Linear(64, 1)
         elif arch_style == "sum query":
-            self.gene2query = nn.Linear(d_model, d_model)
+            self.gene2query = self.ops.Linear(d_model, d_model)
             self.query_activation = query_activation()
-            self.fc1 = nn.Linear(d_model, 64)
+            self.fc1 = self.ops.Linear(d_model, 64)
             self.hidden_activation = hidden_activation()
-            self.fc2 = nn.Linear(64, 1)
+            self.fc2 = self.ops.Linear(64, 1)
         else:
             raise ValueError(f"Unknown arch_style: {arch_style}")
 
@@ -147,7 +150,7 @@ class MVCDecoder(nn.Module):
             return self.fc2(h).squeeze(2)  # (batch, seq_len)
 
 
-class AdversarialDiscriminator(nn.Module):
+class AdversarialDiscriminator(BaseLayers):
     """
     Discriminator for the adversarial training for batch correction.
     """
@@ -159,15 +162,16 @@ class AdversarialDiscriminator(nn.Module):
         nlayers: int = 3,
         activation: callable = nn.LeakyReLU,
         reverse_grad: bool = False,
+        **kwargs,
     ):
-        super().__init__()
+        super().__init__(**kwargs)
         # module list
-        self._decoder = nn.ModuleList()
+        self._decoder = self.ops.ModuleList()
         for i in range(nlayers - 1):
-            self._decoder.append(nn.Linear(d_model, d_model))
+            self._decoder.append(self.ops.Linear(d_model, d_model))
             self._decoder.append(activation())
-            self._decoder.append(nn.LayerNorm(d_model))
-        self.out_layer = nn.Linear(d_model, n_cls)
+            self._decoder.append(self.ops.LayerNorm(d_model))
+        self.out_layer = self.ops.Linear(d_model, n_cls)
         self.reverse_grad = reverse_grad
 
     def forward(self, x: Tensor) -> Tensor:
@@ -182,30 +186,31 @@ class AdversarialDiscriminator(nn.Module):
         return self.out_layer(x)
 
 
-class ExprDecoder(nn.Module):
+class ExprDecoder(BaseLayers):
     def __init__(
         self,
         d_model: int,
         explicit_zero_prob: bool = False,
         use_batch_labels: bool = False,
+        **kwargs,
     ):
-        super().__init__()
+        super().__init__(**kwargs)
         d_in = d_model * 2 if use_batch_labels else d_model
-        self.fc = nn.Sequential(
-            nn.Linear(d_in, d_model),
-            nn.LeakyReLU(),
-            nn.Linear(d_model, d_model),
-            nn.LeakyReLU(),
-            nn.Linear(d_model, 1),
+        self.fc = self.ops.Sequential(
+            self.ops.Linear(d_in, d_model),
+            self.ops.LeakyReLU(),
+            self.ops.Linear(d_model, d_model),
+            self.ops.LeakyReLU(),
+            self.ops.Linear(d_model, 1),
         )
         self.explicit_zero_prob = explicit_zero_prob
         if explicit_zero_prob:
-            self.zero_logit = nn.Sequential(
-                nn.Linear(d_in, d_model),
-                nn.LeakyReLU(),
-                nn.Linear(d_model, d_model),
-                nn.LeakyReLU(),
-                nn.Linear(d_model, 1),
+            self.zero_logit = self.ops.Sequential(
+                self.ops.Linear(d_in, d_model),
+                self.ops.LeakyReLU(),
+                self.ops.Linear(d_model, d_model),
+                self.ops.LeakyReLU(),
+                self.ops.Linear(d_model, 1),
             )
 
     def forward(self, x: Tensor) -> Dict[str, Tensor]:

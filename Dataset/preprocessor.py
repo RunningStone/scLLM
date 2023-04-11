@@ -368,7 +368,7 @@ class Preprocessor:
             class_weight (:class:`torch.tensor`):
                 The class weight of the each category
         """
-        logger.info(f"Binarize label {label_key} in obs_names")
+        logger.info(f"Discritize label {label_key} in obs_names")
         original_label = self.adata.obs[label_key] 
         if binarize is not None:
             assert binarize in ["equal_width","equal_instance"]

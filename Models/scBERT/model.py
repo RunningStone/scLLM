@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from scLLM.Modules.utils import  exists, cast_tuple
-from scLLM.Modules.gene_encoder import Gene2VecPositionalEmbedding
+from scLLM.Modules.layers.gene_encoder import Gene2VecPositionalEmbedding
 from scLLM.Modules.Performer import Performer
 from scLLM.Modules.utils import  Always
 from scLLM.Modules.init import APEX_AVAILABLE
