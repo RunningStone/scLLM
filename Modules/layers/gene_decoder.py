@@ -6,7 +6,7 @@ from typing import  Union, Dict
 from scLLM.Modules.sequence.reversible import grad_reverse
 from scLLM.Modules.layers.base import BaseLayers
 
-class ClsDecoder(BaseLayers):
+class ClsDecoder(nn.Module,BaseLayers):
     """
     Decoder for classification task.
     """
@@ -19,7 +19,8 @@ class ClsDecoder(BaseLayers):
         activation: callable = nn.ReLU,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        nn.Module.__init__(self,)
+        BaseLayers.__init__(self,**kwargs)
         # module list
         self._decoder = self.ops.ModuleList()
         for i in range(nlayers - 1):
@@ -38,7 +39,7 @@ class ClsDecoder(BaseLayers):
         return self.out_layer(x)
 
 
-class MVCDecoder(BaseLayers):
+class MVCDecoder(nn.Module,BaseLayers):
     """
     Decoder for the masked value prediction for cell embeddings.
 
@@ -82,7 +83,8 @@ class MVCDecoder(BaseLayers):
             hidden_activation (:obj:`nn.Module`): activation function for the hidden
                 layers.
         """
-        super().__init__(**kwargs)
+        nn.Module.__init__(self,)
+        BaseLayers.__init__(self,**kwargs)
         d_in = d_model * 2 if use_batch_labels else d_model
         if arch_style in ["inner product", "inner product, detach"]:
             self.gene2query = self.ops.Linear(d_model, d_model)
@@ -150,7 +152,7 @@ class MVCDecoder(BaseLayers):
             return self.fc2(h).squeeze(2)  # (batch, seq_len)
 
 
-class AdversarialDiscriminator(BaseLayers):
+class AdversarialDiscriminator(nn.Module,BaseLayers):
     """
     Discriminator for the adversarial training for batch correction.
     """
@@ -164,7 +166,8 @@ class AdversarialDiscriminator(BaseLayers):
         reverse_grad: bool = False,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        nn.Module.__init__(self,)
+        BaseLayers.__init__(self,**kwargs)
         # module list
         self._decoder = self.ops.ModuleList()
         for i in range(nlayers - 1):
@@ -186,7 +189,7 @@ class AdversarialDiscriminator(BaseLayers):
         return self.out_layer(x)
 
 
-class ExprDecoder(BaseLayers):
+class ExprDecoder(nn.Module,BaseLayers):
     def __init__(
         self,
         d_model: int,
@@ -194,7 +197,8 @@ class ExprDecoder(BaseLayers):
         use_batch_labels: bool = False,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        nn.Module.__init__(self,)
+        BaseLayers.__init__(self,**kwargs)
         d_in = d_model * 2 if use_batch_labels else d_model
         self.fc = self.ops.Sequential(
             self.ops.Linear(d_in, d_model),

@@ -8,10 +8,12 @@ import torch
 import torch.nn as nn
 from scLLM.Modules.ops.base import BasicOps
 
-class BaseLayers(nn.Module):
+class BaseLayers:
     def __init__(
         self,
-        ops = BasicOps(),
+        ops_fn = BasicOps,
+        ops_class_name:list=["custom_norm","fast_attention"],
+        ops_class_para:list=[None,None],
     ):
         super().__init__()
-        self.ops = ops
+        self.ops = ops_fn(ops_class_name,ops_class_para)

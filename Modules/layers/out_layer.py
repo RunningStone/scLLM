@@ -7,9 +7,10 @@ import torch.nn as nn
 from scLLM.Modules.layers.base import BaseLayers
 
 
-class Identity(BaseLayers):
+class scBERT_OutLayer(nn.Module,BaseLayers):
     def __init__(self,in_dim, dropout = 0., h_dim = 100, out_dim = 10,**kwargs):
-        super(Identity, self).__init__(**kwargs)
+        nn.Module.__init__(self,)
+        BaseLayers.__init__(self,**kwargs)
         self.conv1 = self.ops.Conv2d(1, 1, (1, 200))
         self.act = self.ops.ReLU()
         self.fc1 = self.ops.Linear(in_features=in_dim, out_features=512, bias=True)

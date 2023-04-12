@@ -2,8 +2,10 @@ import torch.nn as nn
 from typing import Callable
 import attr
 
+from scLLM.Models.init import model_para_base
+
 @attr.s(auto_attribs=True)
-class scBERT_para:
+class scBERT_para(model_para_base):
     model_name:str = "scBERT"                   # model name
     #----> paras for create model architecture
     num_tokens:int=None                         # num of tokens

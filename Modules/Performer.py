@@ -9,6 +9,7 @@ from functools import partial
 from typing import Callable
 
 # import from scLLM
+from scLLM import logger
 from scLLM.Modules.utils import  exists, cast_tuple,get_module_device,find_modules
 
 from scLLM.Modules.layers.base import BaseLayers
@@ -17,7 +18,7 @@ from scLLM.Modules.layers.Layer_pack import Attention_LayerPack
 
 # performer
 
-class Performer(BaseLayers):
+class Performer(nn.Module,BaseLayers):
     def __init__(
         self,
         dim:int,                                # dimension
@@ -43,11 +44,12 @@ class Performer(BaseLayers):
         no_projection:bool = False,              # with final linear projection or not
         auto_check_redraw:bool = True,           # check redraw projections for all attention layers or not
         qkv_bias:bool = True,                    # qkv with bias or not
-        **kwargs
+        **kwargs                                 # for params to init BaseLayers and ops
     ):
-        super().__init__(**kwargs)
+        nn.Module.__init__(self,)
+        BaseLayers.__init__(self,**kwargs)
 
-
+        logger.debug(f"init Performer module")
         layers = nn.ModuleList([])
         local_attn_heads = cast_tuple(local_attn_heads)
         local_attn_heads = local_attn_heads * depth if len(local_attn_heads) == 1 else local_attn_heads
@@ -55,7 +57,7 @@ class Performer(BaseLayers):
         assert all(map(lambda n: n >= 0 and n <= heads, local_attn_heads)), 'local attention head value must be less than the total number of heads'
         
         #-----------------attention layer define-----------------
-        att_layers_fn_initilizer = Attention_LayerPack(dim=dim,use_scalenorm=use_scalenorm,use_rezero=use_rezero)
+        att_layers_fn_initilizer = Attention_LayerPack(dim=dim,use_scalenorm=use_scalenorm,use_rezero=use_rezero,**kwargs)
         att_type1= partial(     att_layers_fn_initilizer.module_list,
                            # paras define
                                 causal = causal, heads = heads, dim_head = dim_head, 
@@ -63,13 +65,15 @@ class Performer(BaseLayers):
                                 nb_features = nb_features, generalized_attention = generalized_attention, 
                                 kernel_fn = kernel_fn, attn_dropout = attn_dropout, no_projection = no_projection, 
                                 qkv_bias = qkv_bias,
-                                ff_chunks=ff_chunks, ff_mult = ff_mult, ff_dropout = ff_dropout, ff_glu = ff_glu
+                                ff_chunks=ff_chunks, ff_mult = ff_mult, ff_dropout = ff_dropout, ff_glu = ff_glu,
+                                **kwargs
                                 ) 
         att_type2= partial(att_layers_fn_initilizer.module_list,
                             heads = heads, dim_head = dim_head, nb_features = nb_features, 
                             generalized_attention = generalized_attention, kernel_fn = kernel_fn, 
                             attn_dropout = attn_dropout, no_projection = no_projection,
-                            ff_chunks = ff_chunks,ff_mult = ff_mult, ff_dropout = ff_dropout, ff_glu = ff_glu
+                            ff_chunks = ff_chunks,ff_mult = ff_mult, ff_dropout = ff_dropout, ff_glu = ff_glu,
+                            **kwargs
                             )
         
         #-----------------net define-----------------

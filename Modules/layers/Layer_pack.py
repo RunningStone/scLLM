@@ -24,12 +24,13 @@ from scLLM.Modules.layers.feedForward import FeedForward
 from scLLM.Modules.utils import  ReZero, Chunk
 
 
-class Attention_LayerPack(BaseLayers):
+class Attention_LayerPack(nn.Module,BaseLayers):
     def __init__(self, dim, 
                  use_scalenorm,
                  use_rezero,
                  **kwargs):
-        super().__init__(**kwargs)
+        nn.Module.__init__(self,)
+        BaseLayers.__init__(self,**kwargs)
 
         self.dim = dim
         if use_scalenorm:
@@ -56,6 +57,7 @@ class Attention_LayerPack(BaseLayers):
                  ff_dropout:float = 0.,                    # feedforward dropout
                  ff_mult:int = 4,                        # dim of intermediate features after attention / dim of input features
                  ff_chunks:int = 1,                      # chunk feedforward layer, from Reformer
+                 **kwargs
                  ):
         return    nn.ModuleList([
                 self.wrapper_fn(SelfAttention(self.dim, causal = causal, heads = heads, 
@@ -63,7 +65,9 @@ class Attention_LayerPack(BaseLayers):
                                          local_window_size = local_window_size, 
                                          nb_features = nb_features, generalized_attention = generalized_attention,
                                          kernel_fn = kernel_fn, dropout = attn_dropout, 
-                                         no_projection = no_projection, qkv_bias = qkv_bias)),
-                self.wrapper_fn(Chunk(ff_chunks, FeedForward(self.dim, mult = ff_mult, dropout = ff_dropout, glu = ff_glu), along_dim = 1))
+                                         no_projection = no_projection, qkv_bias = qkv_bias,
+                                         **kwargs)),
+                self.wrapper_fn(Chunk(ff_chunks, FeedForward(self.dim, mult = ff_mult, dropout = ff_dropout, glu = ff_glu,
+                                                             **kwargs), along_dim = 1))
             ])
     

@@ -5,12 +5,13 @@ from scLLM.Modules.utils import default
 from scLLM.Modules.layers.base import BaseLayers
 
 
-class FeedForward(BaseLayers):
+class FeedForward(nn.Module,BaseLayers):
     def __init__(self, dim, mult = 4, dropout = 0., 
                  activation = None, 
                  glu = False,
                  **kwargs):
-        super().__init__(**kwargs)
+        nn.Module.__init__(self,)
+        BaseLayers.__init__(self,**kwargs)
         activation = default(activation, nn.GELU)
 
         self.glu = glu

@@ -9,7 +9,7 @@ from torch import Tensor
 from einops import rearrange, repeat
 # sinusoidal positional embeddings
 from typing import Optional, Tuple
-
+from scLLM import logger
 from scLLM.Modules.layers.base import BaseLayers
 #########################################################################################
 #            rotary positional embeddings
@@ -34,9 +34,11 @@ def apply_rotary_pos_emb(q, k, sinu_pos):
 #########################################################################################
 # positional embeddings
 
-class AbsolutePositionalEmbedding(BaseLayers):
+class AbsolutePositionalEmbedding(nn.Module,BaseLayers):
+
     def __init__(self, dim, max_seq_len,**kwargs):
-        super().__init__(**kwargs)
+        nn.Module.__init__(self,)
+        BaseLayers.__init__(self,**kwargs)
         self.emb = self.ops.Embedding(max_seq_len, dim)
 
     def forward(self, x):
@@ -46,9 +48,11 @@ class AbsolutePositionalEmbedding(BaseLayers):
 #########################################################################################
 #            gene 2 vec positional embeddings
 #########################################################################################
-class Gene2VecPositionalEmbedding(BaseLayers):
+class Gene2VecPositionalEmbedding(nn.Module,BaseLayers):
     def __init__(self, gene2vec_weight:str=None, max_seq_len:int=16907,**kwargs):
-        super().__init__(**kwargs)
+        nn.Module.__init__(self,)
+        BaseLayers.__init__(self,**kwargs)
+        logger.debug("Gene2VecPositionalEmbedding initialised")
         if gene2vec_weight is not None:
             gene2vec_weight = np.load(gene2vec_weight)
         else:
@@ -70,7 +74,7 @@ class Gene2VecPositionalEmbedding(BaseLayers):
 #            gene encoder
 #########################################################################################
 
-class GeneNNEncoder(BaseLayers):
+class GeneNNEncoder(nn.Module,BaseLayers):
     def __init__(
         self,
         num_embeddings: int,
@@ -78,7 +82,8 @@ class GeneNNEncoder(BaseLayers):
         padding_idx: Optional[int] = None,
         **kwargs
     ):
-        super().__init__(**kwargs)
+        nn.Module.__init__(self,)
+        BaseLayers.__init__(self,**kwargs)
         self.embedding = self.ops.Embedding(
             num_embeddings, embedding_dim, padding_idx=padding_idx
         )
@@ -90,9 +95,10 @@ class GeneNNEncoder(BaseLayers):
         return x
 
 
-class VanillaPositionalEncoding(BaseLayers):
+class VanillaPositionalEncoding(nn.Module,BaseLayers):
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000,**kwargs):
-        super().__init__(**kwargs)
+        nn.Module.__init__(self,)
+        BaseLayers.__init__(self,**kwargs)
         self.dropout = self.ops.Dropout(p=dropout)
 
         position = torch.arange(max_len).unsqueeze(1)
@@ -113,13 +119,14 @@ class VanillaPositionalEncoding(BaseLayers):
         return self.dropout(x)
 
 
-class ContinuousValueEncoder(BaseLayers):
+class ContinuousValueEncoder(nn.Module,BaseLayers):
     """
     Encode real number values to a vector using neural nets projection.
     """
 
     def __init__(self, d_model: int, dropout: float = 0.1, max_value: int = 512,**kwargs):
-        super().__init__(**kwargs)
+        nn.Module.__init__(self,)
+        BaseLayers.__init__(self,**kwargs)
         self.dropout = self.ops.Dropout(p=dropout)
         self.linear1 = self.ops.Linear(1, d_model)
         self.activation = self.ops.ReLU()
@@ -143,7 +150,7 @@ class ContinuousValueEncoder(BaseLayers):
         return self.dropout(x)
 
 
-class CategoryValueEncoder(BaseLayers):
+class CategoryValueEncoder(nn.Module,BaseLayers):
     def __init__(
         self,
         num_embeddings: int,
@@ -151,7 +158,8 @@ class CategoryValueEncoder(BaseLayers):
         padding_idx: Optional[int] = None,
         **kwargs
     ):
-        super().__init__(**kwargs)
+        nn.Module.__init__(self,)
+        BaseLayers.__init__(self,**kwargs)
         self.embedding = self.ops.Embedding(
             num_embeddings, embedding_dim, padding_idx=padding_idx
         )
@@ -164,7 +172,7 @@ class CategoryValueEncoder(BaseLayers):
         return x
 
 
-class BatchLabelEncoder(BaseLayers):
+class BatchLabelEncoder(nn.Module,BaseLayers):
     def __init__(
         self,
         num_embeddings: int,
@@ -172,7 +180,8 @@ class BatchLabelEncoder(BaseLayers):
         padding_idx: Optional[int] = None,
         **kwargs
     ):
-        super().__init__(**kwargs)
+        nn.Module.__init__(self,)
+        BaseLayers.__init__(self,**kwargs)
         self.embedding = self.ops.Embedding(
             num_embeddings, embedding_dim, padding_idx=padding_idx
         )

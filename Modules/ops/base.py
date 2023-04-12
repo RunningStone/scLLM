@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 
 from functools import partial
+from scLLM import logger
 # declare implemented methods that will replace basic blocks
 
 peft_supported_methods = ["peft_lora","custom_norm","fast_attention"]
@@ -31,6 +32,7 @@ class BasicOps:
         torch_nn_methods = [method for method in dir(nn) if callable(getattr(nn, method))]
         # use setattr to bind all functions in torch.nn to self
         for nn_method_name in torch_nn_methods: 
+            #logger.debug(f"bind {nn_method_name} to self")
             setattr(self,nn_method_name,getattr(nn,nn_method_name))
         #-----> bind customised ops:
         if self.ops_class_name is not None:
@@ -42,6 +44,7 @@ class BasicOps:
         #-----> replace part:
         # replace some functions with customized functions
         if name == "peft_lora":
+            logger.debug("replace Linear and Conv2d with LoRA version, and add MergedLinear")
             from scLLM.Modules.ops.lora import LoRALinear,LoRAConv2d,LoRAMergedLinear
             self.Linear = partial(LoRALinear,lora_para = para)
             self.Conv2d = partial(LoRAConv2d,lora_para = para)

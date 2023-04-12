@@ -28,7 +28,7 @@ from scLLM.Modules.layers.base import BaseLayers
 ############################################################################################################
 #               self Attention with fast attention module
 ############################################################################################################
-class SelfAttention(BaseLayers):
+class SelfAttention(nn.Module,BaseLayers):
     def __init__(
         self,
         dim,
@@ -46,7 +46,8 @@ class SelfAttention(BaseLayers):
         qkv_bias = False,
         **kwargs
     ):
-        super().__init__(**kwargs)
+        nn.Module.__init__(self,)
+        BaseLayers.__init__(self,**kwargs)
         assert dim % heads == 0, 'dimension must be divisible by number of heads'
 
         # init ops module

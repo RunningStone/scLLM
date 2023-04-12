@@ -5,7 +5,7 @@ import torch
 from torch import nn, Tensor
 import torch.distributed as dist
 import torch.nn.functional as F
-
+from scLLM.Modules.layers.base import BaseLayers
 class Transformer(nn.Module):
     def __init__(
         self,
@@ -16,9 +16,10 @@ class Transformer(nn.Module):
         depth: int,     # depth of transformer
 
         dropout: float = 0.5,
-
+        **kwargs
     ):
-        super().__init__()
+        nn.Module.__init__(self,)
+        BaseLayers.__init__(self,**kwargs)
         encoder_layers = nn.TransformerEncoderLayer(
             dim, heads, dim_head, dropout, batch_first=True
         )

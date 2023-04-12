@@ -25,7 +25,7 @@ import torch.nn.functional as F
 
 import math
 from typing import Optional, List
-
+from scLLM import logger
 # add a common parameter class for lora
 import attr
 @attr.s(auto_attribs=True)
@@ -52,6 +52,7 @@ class LoRALayer():
         lora_dropout: float,
         merge_weights: bool,
     ):
+        logger.debug("LoRA layer initialized")
         self.r = r
         self.lora_alpha = lora_alpha
         # Optional dropout
