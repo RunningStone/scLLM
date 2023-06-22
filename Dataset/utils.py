@@ -1,5 +1,8 @@
 import random
 import torch
+from typing import Dict, Optional, Union,Tuple,List
+from torch.utils.data import DataLoader, Dataset
+
 
 def mask_list(original_list,mask):
     """
@@ -21,3 +24,22 @@ def random_sample(data,label,cls_nb):
     full_seq = torch.cat((full_seq, torch.tensor([0])))
     seq_label = label[rand_start]
     return full_seq, seq_label
+
+def to_dataloader(dataset:Dataset,trainer_para,sampler:Optional[torch.utils.data.Sampler]=None):
+    """
+    Get dataloader from dataset
+    Args:
+        dataset: dataset to get dataloader
+    Returns:
+        dataloader
+    """        
+    if sampler is not None:
+        trainer_para.shuffle = False
+        trainer_para.additional_dataloader_para["sampler"] = sampler
+    dataloader = DataLoader(dataset, 
+                            batch_size=trainer_para.batch_size, 
+                            shuffle=trainer_para.shuffle, 
+                            num_workers=trainer_para.num_workers,
+                            **trainer_para.additional_dataloader_para,
+                            )
+    return dataloader

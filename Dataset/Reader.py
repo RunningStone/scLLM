@@ -196,13 +196,15 @@ class scReader:
     #############################################################################################################
     def preprocess(self,batch_key: Optional[str] = None):
         self.preprocess = scPreprocessor(self.para)
-        self.adata = self.preprocess(self.adata)
+        self.adata = self.preprocess(self.adata,batch_key=batch_key)
 
     def postprocess(self):
         if self.para.tokenize_name == "scBERT":
             self.postprocess = scBERTPostprocessor(self.para,self.vocab)
+            
         elif self.para.tokenize_name == "scGPT":
             self.postprocess = scGPTPostprocessor(self.para,self.vocab)
         else:
             raise ValueError(f"tokenize_name {self.para.tokenize_name} not supported.")
-        
+        train_dataset,valid_dataset = self.postprocess(self.adata)
+        return train_dataset,valid_dataset

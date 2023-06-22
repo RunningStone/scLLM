@@ -1,4 +1,5 @@
 from typing import Any, Optional, Union
+import numpy as np
 import attr
 
 @attr.s(auto_attribs=True)
@@ -7,9 +8,12 @@ class Dataset_para:
     Dataset parameters
     """
     #--------> data loading steps
+    var_idx:str = None # gene i.e. "gene_syb"
+    obs_idx:str = None # labels i.e. "pseudotimes"
     # for gene2vec encoding or other embedding methods the entire vocabulary is needed
     vocab_loc: str = None
     gene_vocab:list = None #['gene1','gene2',...] 
+
     #--------> preprocessing steps
     #(:class:`str`, optional) The key of :class:`~anndata.AnnData` to use for preprocessing.
     use_key: Optional[str] = "X" 
@@ -47,7 +51,7 @@ class Dataset_para:
 
     #--------> tokenization steps
     #---->tokenize name
-    tokenize_name: str = "simple" #["simple", "scGPT"]
+    tokenize_name: str = "scBERT" #["scBERT", "scGPT"]
     #---->tokenize
     return_pt: bool = True
     append_cls: bool = True
@@ -67,4 +71,24 @@ class Dataset_para:
     preprocessed_loc: str = None
 
     #--------> dataset steps
-    # how to split dataset
+    data_type:str = "log1p" # "log1p","X","X_normed","X_binned","X_log1p"
+    label_key: str=None
+    # number of categories for classification
+    cls_nb:int = None
+    #-> for binarize label
+    binarize:str="equal_instance" # "equal_instance" or "equal_width"
+    bins:np.ndarray=None
+    #bin_nb: int=None
+    bin_min:float=None
+    bin_max:float=None
+    save_in_obs:bool=True # save binarize label in obs parameter in anndata
+
+
+    #-> split train test
+    n_splits:int=1
+    test_size:float=0.2
+    random_state:int=2023
+
+    shuffle:bool=True
+    sort_seq_batch:bool=False
+    

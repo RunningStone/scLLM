@@ -1,10 +1,21 @@
+import torch
+from typing import Dict, Optional, Union,Tuple,List
+import numpy as np, scanpy as sc, anndata as ad
+from scipy.sparse import issparse
+from scipy.sparse import issparse,lil_matrix,csr_matrix
+from scanpy.get import _get_obs_rep, _set_obs_rep
+from anndata import AnnData
 from transformers.tokenization_utils import PreTrainedTokenizer
 from transformers import AutoTokenizer, BertTokenizer
+from torch.utils.data import DataLoader, Dataset
 
 from scLLM import logger
+from scLLM.Dataset.paras import Dataset_para
+from scLLM.Dataset.Vocab import GeneVocab
+
 
 class scBERTPostprocessor:
-    def __init__(self,paras:Dataset_para,vocab:Vocab) -> None:
+    def __init__(self,paras:Dataset_para,vocab:GeneVocab) -> None:
         self.paras = paras
         self.vocab = vocab
 
@@ -12,23 +23,18 @@ class scBERTPostprocessor:
                  adata,
                  # extend vocab
                  var_idx,obs_idx,
-                 # to data
-                 data_type:str="X",
-                 # to label
-                 label_key: str=None, 
-                    #----> for binarize label
-                    binarize:str=None,
-                    bins:np.ndarray=None,
-                    bin_nb: int=None,bin_min:float=None,bin_max:float=None,
-                    save_in_obs:bool=True,
-                 # split train test
-                 n_splits=1, 
-                 test_size=0.2, 
-                 random_state=2023,
-                 # create dataset
-                 upper_bound: int = 5,
-                 device: str = "cpu",
                 ):
+        # data part
+        data_type = self.paras.data_type
+        # label part
+        label_key = self.paras.label_key
+        cls_nb = self.paras.cls_nb
+        binarize = self.paras.binarize # method to binarize label
+        bin_nb = self.paras.bin_nb
+        bin_min = self.paras.bin_min
+        bin_max = self.paras.bin_max
+        save_in_obs = self.paras.save_in_obs
+
         # scBERT always keep matrix width same with vocab length
         extend_adata = self.extend_vocab(adata,var_idx,obs_idx)
 
@@ -39,7 +45,7 @@ class scBERTPostprocessor:
                                   label_key=label_key,
                                   #----> for binarize label
                                     binarize=binarize,
-                                    bins=bins,
+                                    bins=cls_nb,
                                     bin_nb=bin_nb,bin_min=bin_min,bin_max=bin_max,
                                     save_in_obs=save_in_obs,
                                   )
@@ -52,12 +58,12 @@ class scBERTPostprocessor:
                                               )
         # for train part
         trainset = self.create_dataset(D_train,
-                                       upper_bound=upper_bound,
-                                       device=device,)
+                                       cls_nb=cls_nb,
+                                       )
         # for val part
         valset = self.create_dataset(D_val,
-                                        upper_bound=upper_bound,
-                                        device=device,)
+                                        cls_nb=cls_nb,
+                                        )
         return trainset,valset,class_weight
     ##############################################################################################################
     #  tokenize steps for scBERT
@@ -199,37 +205,22 @@ class scBERTPostprocessor:
                                      random_state=random_state)
 
         idx_tr,idx_val = next(iter(sss.split(all_data, all_label)))
-        data_train, label_train = data[all_data], all_label[idx_tr]
-        data_val, label_val = data[all_data], all_label[idx_val]
+        data_train, label_train = all_data[idx_tr], all_label[idx_tr]
+        data_val, label_val = all_data[idx_val], all_label[idx_val]
         return [data_train,label_train],[data_val,label_val]
     
-    def create_dataset(self,data_and_label:list,upper_bound:int=5,device:str="cpu"):
+    def create_dataset(self,data_and_label:list,cls_nb:int=5):
         [data,label] = data_and_label
         from scLLM.Dataset.dataset import SCDataset
-        dataset = SCDataset(data, label,upper_bound=upper_bound,device=device)
+        dataset = SCDataset(data, label,cls_nb=cls_nb)
         return dataset
 
-    def to_dataloader(self,dataset:Dataset,trainer_para,sampler:Optional[torch.utils.data.Sampler]=None):
-        """
-        Get dataloader from dataset
-        Args:
-            dataset: dataset to get dataloader
-        Returns:
-            dataloader
-        """        
-        if sampler is not None:
-            trainer_para.shuffle = False
-            trainer_para.additional_dataloader_para["sampler"] = sampler
-        dataloader = DataLoader(dataset, 
-                                batch_size=trainer_para.batch_size, 
-                                shuffle=trainer_para.shuffle, 
-                                num_workers=trainer_para.num_workers,
-                                **trainer_para.additional_dataloader_para,
-                                )
-        return dataloader
 
+###################################################################
+#     postprocessor for scGPT include tokenizer and mask
+###################################################################
 class scGPTPostprocessor:
-    def __init__(self,paras:Dataset_para,vocab:Vocab):
+    def __init__(self,paras:Dataset_para,vocab:GeneVocab):
         # tokenizer
         self.return_pt = paras.return_pt
         self.append_cls= paras.append_cls
@@ -249,12 +240,11 @@ class scGPTPostprocessor:
 
         
     def __call__(self,adata:AnnData,
-                 input_layer_key:str = "X_binned",
-                 # split train test
-                 test_size = 0.1,
-                 shuffle = True,
-                 sort_seq_batch = False,
                  ):
+        input_layer_key = self.para.data_type
+        test_size = self.para.test_size
+        shuffle = self.para.shuffle
+        sort_seq_batch = self.para.sort_seq_batch
         # extend to matrixs
         matrixs = self.extend_to_matrixs(adata,input_layer_key)
 
@@ -417,7 +407,8 @@ class scGPTPostprocessor:
         Returns:
             Dict[str, torch.Tensor]: A dictionary of gene_id and count.
         """
-        pad_id = self.vocab[self.pad_token]
+        vocab = self.vocab.to_torchtext_vocab()
+        pad_id = vocab[self.pad_token]
         gene_ids_list = []
         values_list = []
         for i in range(len(batch)):
