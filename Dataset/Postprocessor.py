@@ -35,6 +35,11 @@ class scBERTPostprocessor:
         bin_max = self.paras.bin_max
         save_in_obs = self.paras.save_in_obs
 
+        # split part
+        n_splits = self.paras.n_splits
+        test_size = self.paras.test_size
+        random_state = self.paras.random_state
+
         # scBERT always keep matrix width same with vocab length
         extend_adata = self.extend_vocab(adata,var_idx,obs_idx)
 
