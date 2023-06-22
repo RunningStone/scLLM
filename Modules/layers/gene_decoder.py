@@ -6,6 +6,10 @@ from typing import  Union, Dict
 from scLLM.Modules.sequence.reversible import grad_reverse
 from scLLM.Modules.layers.base import BaseLayers
 
+
+############################################################################################################
+#           Decoders for scGPT model
+############################################################################################################
 class ClsDecoder(nn.Module,BaseLayers):
     """
     Decoder for classification task.
@@ -41,6 +45,7 @@ class ClsDecoder(nn.Module,BaseLayers):
 
 class MVCDecoder(nn.Module,BaseLayers):
     """
+    copy from scGPT/scgpt/model/model.py and modified
     Decoder for the masked value prediction for cell embeddings.
 
     There are actually three ways of making this, all start with gene_embs -> query_vecs,
@@ -60,7 +65,6 @@ class MVCDecoder(nn.Module,BaseLayers):
     2. Bare in mind to avoid short cut for the model to just predict
     value form the query. Make sure predict based on the cell_emb.
     3. Guess it will be better to use sigmoid for the query vecs.
-    4. TODO: Optionally, can even try detach the gene_embs when making query_vec.
     """
 
     def __init__(

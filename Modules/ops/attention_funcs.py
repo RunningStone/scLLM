@@ -6,11 +6,12 @@ functions to accelerate the attention process
 import torch
 import math
 
+from typing import Dict, Mapping, Optional, Tuple, Any, Union
 from functools import partial
 from einops import  repeat
 
 import torch
-from torch import nn
+from torch import nn, Tensor
 
 import torch.cuda.amp as amp
 from torch.cuda.amp import autocast
@@ -232,3 +233,81 @@ class FastAttention(nn.Module):
             return out, attn_weights
         else:
             return out
+
+############################################################################################################
+#    flash attention wrapper and layers
+############################################################################################################
+"""
+Flash attention from https://github.com/HazyResearch/flash-attention 
+required for scGPT
+"""
+
+class FlashAttention(nn.Module):
+    def __init__(
+        self,
+        d_model,
+        nhead,
+        batch_first=True,
+        dropout=0.0,
+        layer_norm_eps=1e-5,
+        device=None,
+        dtype=None,
+        ) -> None:
+        super().__init__()
+        try:
+            from flash_attn.flash_attention import FlashMHA
+        except:
+            raise ImportError("Please install flash-attention .")
+        else:
+            factory_kwargs = {"device": device, "dtype": dtype}
+            self.self_attn = FlashMHA(
+                    embed_dim=d_model,
+                    num_heads=nhead,
+                    batch_first=batch_first,
+                    attention_dropout=dropout,
+                    device=device,
+                    dtype=dtype,
+                )
+            self.norm1 = nn.LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
+            self.norm2 = nn.LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
+            self.dropout1 = nn.Dropout(dropout)
+
+    def forward(
+        self,
+        qkv: Tensor,
+        src_mask: Optional[Tensor] = None,
+        src_key_padding_mask: Optional[Tensor] = None,
+        ) -> Tensor:
+        r"""Pass the input through the encoder layer.
+
+        Args:
+            qkv: qkv: The tensor containing the query, key, and value. (B, S, 3, H, D) if key_padding_mask is None
+                if unpadded: (nnz, 3, h, d) : it is the sequence to the encoder layer (required).
+            src_mask: the mask for the src sequence (optional).
+            src_key_padding_mask: the mask for the src keys per batch (optional).
+
+        Shape:
+            see the docs in Transformer class.
+        """
+        if src_mask is not None:
+            raise ValueError("FlashTransformerEncoderLayer does not support src_mask")
+
+        if not src_key_padding_mask.any().item():
+            # no padding tokens in src
+            src_key_padding_mask_ = None
+        else:
+            # NOTE: the FlashMHA uses mask 0 for padding tokens, which is the opposite
+            src_key_padding_mask_ = ~src_key_padding_mask
+
+        if self.norm_scheme == "pre":
+            src = self.norm1(qkv)
+            src2 = self.self_attn(src, key_padding_mask=src_key_padding_mask_)[0]
+            src = src + self.dropout1(src2)
+            src = self.norm2(src)
+
+        else:
+            src2 = self.self_attn(qkv, key_padding_mask=src_key_padding_mask_)[0]
+            src = qkv + self.dropout1(src2)
+            src = self.norm1(src)
+
+        return src

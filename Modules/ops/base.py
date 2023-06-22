@@ -59,9 +59,15 @@ class BasicOps:
 
         elif name == "fast_attention":
             from local_attention import LocalAttention
-            from scLLM.Modules.ops.attention_funcs import FastAttention
+            from scLLM.Modules.ops.attention_funcs import FastAttention,FlashAttention
+            from scLLM.Modules.ops.similarity import CosineSimilarity_div_temp
             self.LocalAttention = LocalAttention
             self.FastAttention = FastAttention
+        elif name == "flash_attention":
+            from scLLM.Modules.ops.attention_funcs import FlashAttention
+            from scLLM.Modules.ops.similarity import CosineSimilarity_div_temp
+            self.FlashAttention = FlashAttention
+            self.CosineSimilarity_div_temp = CosineSimilarity_div_temp
         else:
             raise NotImplementedError
     

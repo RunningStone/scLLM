@@ -173,7 +173,7 @@ class ReversibleSequence(nn.Module):
 ############################################################################################################
 #       reverse gradient with lambd as a parameter
 ############################################################################################################
-# for scFormer
+# for scGPT
 class GradReverse(Function):
     @staticmethod
     def forward(ctx, x: torch.Tensor, lambd: float) -> torch.Tensor:

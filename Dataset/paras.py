@@ -8,6 +8,7 @@ class Dataset_para:
     """
     #--------> data loading steps
     # for gene2vec encoding or other embedding methods the entire vocabulary is needed
+    vocab_loc: str = None
     gene_vocab:list = None #['gene1','gene2',...] 
     #--------> preprocessing steps
     #(:class:`str`, optional) The key of :class:`~anndata.AnnData` to use for preprocessing.
@@ -43,6 +44,24 @@ class Dataset_para:
     binning: Optional[int] = None
     #(:class:`str`, default: ``"X_binned"``): The key of :class:`~anndata.AnnData` to store the binned data.
     result_binned_key: str = "X_binned"
+
+    #--------> tokenization steps
+    #---->tokenize name
+    tokenize_name: str = "simple" #["simple", "scGPT"]
+    #---->tokenize
+    return_pt: bool = True
+    append_cls: bool = True
+    include_zero_gene: bool = False
+    cls_id: int = "<cls>"
+    #----> add pad
+    max_len: int = 16000
+    pad_token: str = "<pad>"
+    pad_value: int = 0
+    cls_appended: bool = True
+    #----> mask
+    mask_ratio: float = 0.15
+    mask_value: int = -1
+    pad_value: int = 0
 
     #--------> data saving steps
     preprocessed_loc: str = None

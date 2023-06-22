@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 from contextlib import contextmanager
-
+import torch
+from torch import Tensor
 ########################################################################################
 #                   helpers function from scBERT
 ########################################################################################
@@ -99,3 +100,20 @@ class Similarity(nn.Module):
         return self.cos(x, y) / self.temp
 
 
+########################################################################################
+#                   helpers modules from scGPT
+########################################################################################
+
+def generate_square_subsequent_mask(sz: int) -> Tensor:
+    """Generates an upper-triangular matrix of -inf, with zeros on diag."""
+    return torch.triu(torch.ones(sz, sz) * float("-inf"), diagonal=1)
+
+def tensorlist2tensor(tensorlist, pad_value):
+    max_len = max(len(t) for t in tensorlist)
+    dtype = tensorlist[0].dtype
+    device = tensorlist[0].device
+    tensor = torch.zeros(len(tensorlist), max_len, dtype=dtype, device=device)
+    tensor.fill_(pad_value)
+    for i, t in enumerate(tensorlist):
+        tensor[i, : len(t)] = t
+    return tensor

@@ -1,0 +1,503 @@
+from transformers.tokenization_utils import PreTrainedTokenizer
+from transformers import AutoTokenizer, BertTokenizer
+
+from scLLM import logger
+
+class scBERTPostprocessor:
+    def __init__(self,paras:Dataset_para,vocab:Vocab) -> None:
+        self.paras = paras
+        self.vocab = vocab
+
+    def __call__(self,
+                 adata,
+                 # extend vocab
+                 var_idx,obs_idx,
+                 # to data
+                 data_type:str="X",
+                 # to label
+                 label_key: str=None, 
+                    #----> for binarize label
+                    binarize:str=None,
+                    bins:np.ndarray=None,
+                    bin_nb: int=None,bin_min:float=None,bin_max:float=None,
+                    save_in_obs:bool=True,
+                 # split train test
+                 n_splits=1, 
+                 test_size=0.2, 
+                 random_state=2023,
+                 # create dataset
+                 upper_bound: int = 5,
+                 device: str = "cpu",
+                ):
+        # scBERT always keep matrix width same with vocab length
+        extend_adata = self.extend_vocab(adata,var_idx,obs_idx)
+
+        # get all data
+        all_data = self.to_data(adata=extend_adata,data_type=data_type)
+        # get all label
+        all_label,class_weight = self.to_label(adata=adata,
+                                  label_key=label_key,
+                                  #----> for binarize label
+                                    binarize=binarize,
+                                    bins=bins,
+                                    bin_nb=bin_nb,bin_min=bin_min,bin_max=bin_max,
+                                    save_in_obs=save_in_obs,
+                                  )
+        # split train test
+        D_train,D_val = self.split_train_test(all_data,all_label,
+                                              # for how to split
+                                              n_splits=n_splits, 
+                                              test_size=test_size, 
+                                              random_state=random_state,
+                                              )
+        # for train part
+        trainset = self.create_dataset(D_train,
+                                       upper_bound=upper_bound,
+                                       device=device,)
+        # for val part
+        valset = self.create_dataset(D_val,
+                                        upper_bound=upper_bound,
+                                        device=device,)
+        return trainset,valset,class_weight
+    ##############################################################################################################
+    #  tokenize steps for scBERT
+    #############################################################################################################
+    def extend_vocab(self,adata,var_idx,obs_idx)->AnnData:
+        """
+        extend data to vocab size and sort as vocab order
+        Args:
+            loc: anndata object location
+            translate: if True, translate anndata from other source into scLLM format
+            var_idx: if translate is True, var_idx is the name of gene name colume in anndata.var object
+            obs_idx: if translate is True, obs_idx is the name of label colume in anndata.obs object
+        """
+
+        assert var_idx is not None, "var_idx is None"
+        assert obs_idx is not None, "obs_idx is None"
+        vocab = self.vocab.to_itos()
+        counts = lil_matrix((adata.shape[0],len(vocab)),dtype=np.float32)
+        logger.debug(f"create sparse matrix with shape:{counts.shape}")
+        gene_list = adata.var[var_idx].to_list()
+        logger.debug(f"In original adata with gene {len(gene_list)}")
+        for i in range(len(vocab)):
+            if i % 2000 == 0: logger.debug(f"processing {i}/{len(vocab)}")
+            if vocab[i] in gene_list:
+                mask = (adata.var[var_idx]==vocab[i])
+                if mask.to_list().count(True) > 1:
+                    logger.warn(f"gene {vocab[i]} has more than one columes, mix them up with mean()")
+                    counts[:,i] = adata.X[:,mask].mean(axis=1)
+                else:
+                    counts[:,i] = adata.X[:,mask]
+            counts = counts.tocsr()
+            obs = adata.obs[obs_idx].to_frame() # can only accept dataframe
+            logger.info(f"create anndata in scBERT format..")
+            new = ad.AnnData(X=counts)
+            new.var_names = vocab
+            new.obs = obs
+            new.obs_names = adata.obs_names
+            logger.debug(f"restore anndata in scBERT format..")
+            return new
+    def to_data(self,adata,data_type:str):
+        """
+        Get processed data from AnnData object
+        Args:
+            data_type: "X","normed","log1p","binned"
+        Returns:
+            processed data in sparse matrix format
+        """
+        data_type_list = ["X","normed","log1p","binned"]
+        assert data_type in data_type_list, f"data_type must be in {data_type_list}"
+        if data_type == "X":
+            if self.para.result_normed_key is not None: 
+                logger.warning(f"X is not normalised, check layer {self.para.result_normed_key}")
+            if self.para.result_log1p_key is not None:
+                logger.warning(f"X is not log1p transformed, check layer {self.para.result_log1p_key}")
+            if self.para.result_binned_key is not None:
+                logger.warning(f"X is not binned, check layer {self.para.result_binned_key}")
+            return adata.X
+        else:
+            name_dict = {"normed":self.para.result_normed_key,
+                        "log1p":self.para.result_log1p_key,
+                        "binned":self.para.result_binned_key}
+            data_type_name = name_dict[data_type]
+            all_counts = (
+                    adata.layers[data_type_name].A
+                    if issparse(adata.layers[data_type_name])
+                    else adata.layers[data_type_name])
+            sparse_counts = csr_matrix(all_counts)
+            return sparse_counts
+        
+    def to_label(self,
+                adata:AnnData,
+                label_key: str, 
+                #----> for binarize label
+                binarize:str=None,
+                bins:np.ndarray=None,
+                bin_nb: int=None,bin_min:float=None,bin_max:float=None,
+                save_in_obs:bool=True,
+                
+                ) -> None:
+        """
+        get label from adata.obs[label_key]
+        if binarize is True, then we will binarize the label
+        if save_in_obs is True, then we will save the label in adata.obs[label_key]
+        Args:
+            label_key (:class:`str`):
+                The key of :class:`AnnData.obs` to use as label
+            binarize (:class:`str`)(optional): ["quantile",""]
+                If True, we will binarize the label
+            bins (:class:`np.ndarray`)(optional):
+                The bins to binarize the label
+            bin_nb (:class:`int`)(optional):
+                The number of bins to binarize the label
+            bin_min (:class:`float`)(optional):
+                The min value of bins to binarize the label
+            bin_max (:class:`float`)(optional):
+                The max value of bins to binarize the label
+            save_in_obs (:class:`bool`)(optional):
+                If True, we will save the label in adata.obs[label_key]
+        Returns:
+            label (:class:`torch.tensor`):
+                The label of the data
+            class_weight (:class:`torch.tensor`):
+                The class weight of the each category
+        """
+        logger.info(f"Discritize label {label_key} in obs_names")
+        original_label = adata.obs[label_key] 
+        if binarize is not None:
+            assert binarize in ["equal_width","equal_instance"]
+            if bins is None:
+                assert bin_nb is not None 
+                if bin_min is None: bin_min = original_label.min()
+                if bin_max is None: bin_max = original_label.max()
+                if binarize == "equal_width":
+                    bins = np.linspace(bin_min, bin_max, bin_nb)
+                elif binarize == "equal_instance":
+                    c_label = np.sort(original_label.to_numpy().flatten())
+                    bins = np.array([ c_label[int(((len(c_label)-1)/bin_nb)*i)] for i in range(bin_nb)])
+            bin_names = np.arange(bin_nb)
+            digitized = np.digitize(original_label, bins)
+            binned_label = bin_names[digitized-1]
+            if save_in_obs:
+                obs_name = f"{label_key}_binned"
+                adata.obs[obs_name] = binned_label
+            np_label = binned_label
+        else:
+            np_label = original_label.to_numpy()
+
+        class_num = np.unique(np_label, return_counts=True)[1].tolist()
+        class_weight = torch.tensor([(1 - (x / sum(class_num))) ** 2 for x in class_num])
+        label = torch.from_numpy(np_label).unsqueeze(1)
+        return label,class_weight
+
+    def split_train_valid(self,all_data,all_label,
+                          n_splits=1, test_size=0.2, random_state=2023):
+        from sklearn.model_selection import train_test_split, ShuffleSplit, StratifiedShuffleSplit, StratifiedKFold
+        #skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=2023)
+        sss = StratifiedShuffleSplit(n_splits=n_splits, 
+                                     test_size=test_size, 
+                                     random_state=random_state)
+
+        idx_tr,idx_val = next(iter(sss.split(all_data, all_label)))
+        data_train, label_train = data[all_data], all_label[idx_tr]
+        data_val, label_val = data[all_data], all_label[idx_val]
+        return [data_train,label_train],[data_val,label_val]
+    
+    def create_dataset(self,data_and_label:list,upper_bound:int=5,device:str="cpu"):
+        [data,label] = data_and_label
+        from scLLM.Dataset.dataset import SCDataset
+        dataset = SCDataset(data, label,upper_bound=upper_bound,device=device)
+        return dataset
+
+    def to_dataloader(self,dataset:Dataset,trainer_para,sampler:Optional[torch.utils.data.Sampler]=None):
+        """
+        Get dataloader from dataset
+        Args:
+            dataset: dataset to get dataloader
+        Returns:
+            dataloader
+        """        
+        if sampler is not None:
+            trainer_para.shuffle = False
+            trainer_para.additional_dataloader_para["sampler"] = sampler
+        dataloader = DataLoader(dataset, 
+                                batch_size=trainer_para.batch_size, 
+                                shuffle=trainer_para.shuffle, 
+                                num_workers=trainer_para.num_workers,
+                                **trainer_para.additional_dataloader_para,
+                                )
+        return dataloader
+
+class scGPTPostprocessor:
+    def __init__(self,paras:Dataset_para,vocab:Vocab):
+        # tokenizer
+        self.return_pt = paras.return_pt
+        self.append_cls= paras.append_cls
+        self.include_zero_gene= paras.include_zero_gene
+        self.cls_id= paras.cls_id
+        # pad
+        self.vocab= vocab
+
+        self.max_len= paras.max_len
+        self.pad_token= paras.pad_token
+        self.pad_value= paras.pad_value
+        self.cls_appended= paras.cls_appended
+        # mask
+        self.mask_ratio= paras.mask_ratio
+        self.mask_value= paras.mask_value
+        self.pad_value= paras.pad_value
+
+        
+    def __call__(self,adata:AnnData,
+                 input_layer_key:str = "X_binned",
+                 # split train test
+                 test_size = 0.1,
+                 shuffle = True,
+                 sort_seq_batch = False,
+                 ):
+        # extend to matrixs
+        matrixs = self.extend_to_matrixs(adata,input_layer_key)
+
+        # split train valid
+        D_train,D_val = self.split_train_valid(matrixs, test_size=test_size, shuffle=shuffle)
+
+        # prepare data
+        train_data_pt = self.prepare_data(D_train,sort_seq_batch=sort_seq_batch)
+        valid_data_pt = self.prepare_data(D_val,sort_seq_batch=sort_seq_batch)
+
+        # create dataset
+        train_dataset = self.create_dataset(train_data_pt)
+        valid_dataset = self.create_dataset(valid_data_pt)
+        return train_dataset,valid_dataset
+    ##############################################################################################################
+    #  tokenize steps for scGPT
+    #############################################################################################################
+    def extend_to_matrixs(self,adata,input_layer_key:str = "X_binned"):
+        
+        all_counts = (
+            adata.layers[input_layer_key].A
+            if issparse(adata.layers[input_layer_key])
+            else adata.layers[input_layer_key]
+        )
+        #genes = adata.var["gene_name"].tolist()
+
+        celltypes_labels = adata.obs["celltype"].tolist()  # make sure count from 0
+        num_types = len(set(celltypes_labels))
+        celltypes_labels = np.array(celltypes_labels)
+
+        batch_ids = adata.obs["batch_id"].tolist()
+        num_batch_types = len(set(batch_ids))
+        batch_ids = np.array(batch_ids)
+
+        return [all_counts, celltypes_labels, num_types, batch_ids, num_batch_types]
+
+
+    def split_train_valid(self,matrixs, test_size=0.1, shuffle=True):
+        [all_counts, celltypes_labels, num_types, batch_ids, num_batch_types] = matrixs
+        from sklearn.model_selection import train_test_split
+        (
+            train_data,
+            valid_data,
+            train_celltype_labels,
+            valid_celltype_labels,
+            train_batch_labels,
+            valid_batch_labels,
+        ) = train_test_split(
+            all_counts, celltypes_labels, batch_ids, test_size=0.1, shuffle=True)
+        return [train_data,train_celltype_labels,train_batch_labels],[valid_data,valid_celltype_labels,valid_batch_labels]
+
+    def prepare_data(self,
+                     D,
+                     sort_seq_batch=False) -> Tuple[Dict[str, torch.Tensor]]:
+        [data, celltype_labels, batch_labels] = D
+        # from vocab to gene_id numpy array
+        torch_vocab_item = self.vocab.to_torchtext_vocab()
+        gene_ids = np.array(torch_vocab_item, dtype=int)
+
+        # 
+        tokenized_data = self.tokenize_and_pad_batch(data,gene_ids)
+
+        masked_values_train = self.random_mask_value(
+            tokenized_data["values"],
+            mask_ratio=self.mask_ratio,
+            mask_value=self.mask_value,
+            pad_value=self.pad_value,
+        )
+        logger.info(
+            f"random masking at current epoch, ratio of masked values in train: ",
+            f"{(masked_values_train == self.mask_value).sum() / (masked_values_train - self.pad_value).count_nonzero():.4f}",
+        )
+        input_gene_ids_train = tokenized_data["genes"]
+        input_values_train = masked_values_train
+        target_values_train = tokenized_data["values"]
+        tensor_batch_labels = torch.from_numpy(batch_labels).long()
+        
+
+        if sort_seq_batch:
+            train_sort_ids = np.argsort(batch_labels)
+            input_gene_ids_train = input_gene_ids_train[train_sort_ids]
+            input_values_train = input_values_train[train_sort_ids]
+            target_values_train = target_values_train[train_sort_ids]
+            tensor_batch_labels = tensor_batch_labels[train_sort_ids]
+
+
+        data_pt = {
+            "gene_ids": input_gene_ids_train,
+            "values": input_values_train,
+            "target_values": target_values_train,
+            "batch_labels": tensor_batch_labels,
+        }
+
+        return data_pt
+
+    def create_dataset(self,data_pt:Dict[str, torch.Tensor],)->Dataset:
+        from scLLM.Dataset.dataset import SeqDataset
+        dataset = SeqDataset(data_pt)
+        return dataset
+
+
+
+    def _tokenize_batch(
+        self,
+        data: np.ndarray,
+        gene_ids: np.ndarray,
+    ) -> List[Tuple[Union[torch.Tensor, np.ndarray]]]:
+        """
+        Tokenize a batch of data. Returns a list of tuple (gene_id, count).
+
+        Args:
+            data (array-like): A batch of data, with shape (batch_size, n_features).
+                n_features equals the number of all genes.
+            gene_ids (array-like): A batch of gene ids, with shape (n_features,).
+            return_pt (bool): Whether to return torch tensors of gene_ids and counts,
+                default to True.
+
+        Returns:
+            list: A list of tuple (gene_id, count) of non zero gene expressions.
+        """
+        if data.shape[1] != len(gene_ids):
+            raise ValueError(
+                f"Number of features in data ({data.shape[1]}) does not match "
+                f"number of gene_ids ({len(gene_ids)})."
+            )
+        tokenized_data = []
+        for i in range(len(data)):
+            row = data[i]
+            if self.include_zero_gene:
+                values = row
+                genes = gene_ids
+            else:
+                idx = np.nonzero(row)[0]
+                values = row[idx]
+                genes = gene_ids[idx]
+            if self.append_cls:
+                genes = np.insert(genes, 0, self.cls_id)
+                values = np.insert(values, 0, 0)
+            if self.return_pt:
+                genes = torch.from_numpy(genes).long()
+                values = torch.from_numpy(values)
+            tokenized_data.append((genes, values))
+        return tokenized_data
+
+
+    def _pad_batch(
+        self,
+        batch: List[Tuple],
+
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Pad a batch of data. Returns a list of Dict[gene_id, count].
+
+        Args:
+            batch (list): A list of tuple (gene_id, count).
+            max_len (int): The maximum length of the batch.
+            vocab (Vocab): The vocabulary containing the pad token.
+            pad_token (str): The token to pad with.
+
+        Returns:
+            Dict[str, torch.Tensor]: A dictionary of gene_id and count.
+        """
+        pad_id = self.vocab[self.pad_token]
+        gene_ids_list = []
+        values_list = []
+        for i in range(len(batch)):
+            gene_ids, values = batch[i]
+            if len(gene_ids) > self.max_len:
+                # sample max_len genes
+                if not self.cls_appended:
+                    idx = np.random.choice(len(gene_ids), self.max_len, replace=False)
+                else:
+                    idx = np.random.choice(len(gene_ids) - 1, self.max_len - 1, replace=False)
+                    idx = idx + 1
+                    idx = np.insert(idx, 0, 0)
+                gene_ids = gene_ids[idx]
+                values = values[idx]
+            if len(gene_ids) < self.max_len:
+                gene_ids = torch.cat(
+                    [
+                        gene_ids,
+                        torch.full(
+                            (self.max_len - len(gene_ids),), pad_id, dtype=gene_ids.dtype
+                        ),
+                    ]
+                )
+                values = torch.cat(
+                    [
+                        values,
+                        torch.full((self.max_len - len(values),), self.pad_value, dtype=values.dtype),
+                    ]
+                )
+            gene_ids_list.append(gene_ids)
+            values_list.append(values)
+        batch_padded = {
+            "genes": torch.stack(gene_ids_list, dim=0),
+            "values": torch.stack(values_list, dim=0),
+        }
+        return batch_padded
+
+
+    def tokenize_and_pad_batch(
+        self,
+        data: np.ndarray,
+        gene_ids: np.ndarray,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Tokenize and pad a batch of data. Returns a list of tuple (gene_id, count).
+        """
+        tokenized_data = self._tokenize_batch(data,
+                                            gene_ids,)
+        batch_padded = self._pad_batch(tokenized_data)
+        return batch_padded
+
+
+    def random_mask_value(self,
+        values: Union[torch.Tensor, np.ndarray],
+        ) -> torch.Tensor:
+        """
+        Randomly mask a batch of data.
+
+        Args:
+            values (array-like):
+                A batch of tokenized data, with shape (batch_size, n_features).
+            mask_ratio (float): The ratio of genes to mask, default to 0.15.
+            mask_value (int): The value to mask with, default to -1.
+            pad_value (int): The value of padding in the values, will be kept unchanged.
+
+        Returns:
+            torch.Tensor: A tensor of masked data.
+        """
+        if isinstance(values, torch.Tensor):
+            # it is crutial to clone the tensor, otherwise it changes the original tensor
+            values = values.clone().detach().numpy()
+        else:
+            values = values.copy()
+
+        for i in range(len(values)):
+            row = values[i]
+            non_padding_idx = np.nonzero(row - self.pad_value)[0]
+            n_mask = int(len(non_padding_idx) * self.mask_ratio)
+            mask_idx = np.random.choice(non_padding_idx, n_mask, replace=False)
+            row[mask_idx] = self.mask_value
+        return torch.from_numpy(values).float()
+    
+    
