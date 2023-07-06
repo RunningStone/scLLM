@@ -71,7 +71,7 @@ class Dataset_para:
     preprocessed_loc: str = None
 
     #--------> dataset steps
-    data_type:str = "log1p" # "log1p","X","X_normed","X_binned","X_log1p"
+    data_layer_name:str = "X_log1p" # "X","X_normed","X_binned","X_log1p"
     label_key: str=None
     # number of categories for classification
     cls_nb:int = None

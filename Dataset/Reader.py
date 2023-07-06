@@ -64,7 +64,7 @@ class scReader:
     ##############################################################################################################
     #           read from data
     #############################################################################################################
-    def load_adata(self, loc:str, translate:bool=False, var_idx:str=None,obs_idx:str=None):
+    def load_adata(self, loc:str, translate:bool=False):
         """
         Load data from anndata object
         Args:
@@ -77,30 +77,56 @@ class scReader:
         # read raw data from anndata file
         self.adata = sc.read_h5ad(loc)
         if translate:
-            assert var_idx is not None, "var_idx is None"
+            var_idx = self.para.var_idx
+            obs_idx = self.para.obs_idx
+            is_extend = True if self.para.tokenize_name=="scBERT" else False
+            #assert var_idx is not None, "var_idx is None"
             assert obs_idx is not None, "obs_idx is None"
             # get vocab list
             vocab = self.vocab.to_itos()
             # get X info
-            original_gene_list = self.adata.var[var_idx].to_list()
+            if var_idx is None:
+                original_gene = self.adata.var_names
+                original_gene_list = original_gene.to_list()
+            else:
+                original_gene = self.adata.var[var_idx]
+                original_gene_list = original_gene.to_list()
             logger.debug(f"In original adata with gene {len(original_gene_list)}")
-            # filter out adata not in vocab
-            filted_gene_list = [gene for gene in original_gene_list if gene in vocab]
-            counts = lil_matrix((self.adata.shape[0],len(filted_gene_list)),dtype=np.float32)
-            logger.debug(f"create sparse matrix with shape:{counts.shape}")
+            if is_extend:
+                counts = lil_matrix((self.adata.shape[0],len(vocab)),dtype=np.float32)
+                logger.debug(f"In original adata with gene {len(original_gene_list)}")
+                for i in range(len(vocab)):
+                    if i % 2000 == 0: logger.debug(f"processing {i}/{len(vocab)}")
+                    if vocab[i] in original_gene_list:
+                        # save counts
+                        #mask = (adata.var[var_idx]==vocab[i])
+                        mask = (original_gene==vocab[i])
+                        mask_list = mask.to_list() if isinstance(mask,pd.Series) else mask.tolist()
+                        if mask_list.count(True) > 1:
+                            logger.warn(f"gene {vocab[i]} has more than one columes, mix them up with mean()")
+                            counts[:,i] = self.adata.X[:,mask].mean(axis=1)
+                        else:
+                            counts[:,i] = self.adata.X[:,mask]
+                gene_name = vocab
+            else:
+                # filter out adata not in vocab
+                filted_gene_list = [gene for gene in original_gene_list if gene in vocab]
+                counts = lil_matrix((self.adata.shape[0],len(filted_gene_list)),dtype=np.float32)
+                logger.debug(f"create sparse matrix with shape:{counts.shape}")
 
-            gene_name = []
-            for i in range(len(filted_gene_list)):
-                if i % 1000 == 0: logger.debug(f"processing {i}/{len(filted_gene_list)}")
-                # save counts
-                mask = (self.adata.var[var_idx]==filted_gene_list[i])
-                if mask.to_list().count(True) > 1:
-                    logger.warn(f"gene {vocab[i]} has more than one columes, mix them up with mean()")
-                    counts[:,i] = self.adata.X[:,mask].mean(axis=1)
-                else:
-                    counts[:,i] = self.adata.X[:,mask]
-                # save gene name
-                gene_name.append(filted_gene_list[i])
+                gene_name = []
+                for i in range(len(filted_gene_list)):
+                    if i % 1000 == 0: logger.debug(f"processing {i}/{len(filted_gene_list)}")
+                    # save counts
+                    mask = (original_gene==filted_gene_list[i])
+                    mask_list = mask.to_list() if isinstance(mask,pd.Series) else mask.tolist()
+                    if mask_list.count(True) > 1:
+                        logger.warn(f"gene {vocab[i]} has more than one columes, mix them up with mean()")
+                        counts[:,i] = self.adata.X[:,mask].mean(axis=1)
+                    else:
+                        counts[:,i] = self.adata.X[:,mask]
+                    # save gene name
+                    gene_name.append(filted_gene_list[i])
             counts = counts.tocsr()
             # get obs info normally sample id
             obs = self.adata.obs[obs_idx].to_frame() # can only accept dataframe
@@ -195,16 +221,16 @@ class scReader:
     #  data process
     #############################################################################################################
     def preprocess(self,batch_key: Optional[str] = None):
-        self.preprocess = scPreprocessor(self.para)
-        self.adata = self.preprocess(self.adata,batch_key=batch_key)
+        self.preprocessor = scPreprocessor(self.para)
+        self.adata = self.preprocessor(self.adata,batch_key=batch_key)
 
     def postprocess(self):
         if self.para.tokenize_name == "scBERT":
-            self.postprocess = scBERTPostprocessor(self.para,self.vocab)
+            self.postprocess_worker = scBERTPostprocessor(self.para,self.vocab)
             
         elif self.para.tokenize_name == "scGPT":
-            self.postprocess = scGPTPostprocessor(self.para,self.vocab)
+            self.postprocess_worker = scGPTPostprocessor(self.para,self.vocab)
         else:
             raise ValueError(f"tokenize_name {self.para.tokenize_name} not supported.")
-        train_dataset,valid_dataset = self.postprocess(self.adata)
-        return train_dataset,valid_dataset
+        train_dataset,valid_dataset,w = self.postprocess_worker.run(self.adata)
+        return train_dataset,valid_dataset,w

@@ -1,7 +1,7 @@
 import torch
 from typing import Dict, Optional, Union,Tuple,List
-import numpy as np, scanpy as sc, anndata as ad
-from scipy.sparse import issparse
+import numpy as np, scanpy as sc, anndata as ad,pandas as pd
+
 from scipy.sparse import issparse,lil_matrix,csr_matrix
 from scanpy.get import _get_obs_rep, _set_obs_rep
 from anndata import AnnData
@@ -19,18 +19,16 @@ class scBERTPostprocessor:
         self.paras = paras
         self.vocab = vocab
 
-    def __call__(self,
+    def run(self,
                  adata,
-                 # extend vocab
-                 var_idx,obs_idx,
                 ):
         # data part
-        data_type = self.paras.data_type
+        data_type = self.paras.data_layer_name
         # label part
         label_key = self.paras.label_key
         cls_nb = self.paras.cls_nb
         binarize = self.paras.binarize # method to binarize label
-        bin_nb = self.paras.bin_nb
+        bins = self.paras.bins
         bin_min = self.paras.bin_min
         bin_max = self.paras.bin_max
         save_in_obs = self.paras.save_in_obs
@@ -40,18 +38,15 @@ class scBERTPostprocessor:
         test_size = self.paras.test_size
         random_state = self.paras.random_state
 
-        # scBERT always keep matrix width same with vocab length
-        extend_adata = self.extend_vocab(adata,var_idx,obs_idx)
-
         # get all data
-        all_data = self.to_data(adata=extend_adata,data_type=data_type)
+        all_data = self.to_data(adata=adata,data_type=data_type)
         # get all label
         all_label,class_weight = self.to_label(adata=adata,
                                   label_key=label_key,
                                   #----> for binarize label
                                     binarize=binarize,
-                                    bins=cls_nb,
-                                    bin_nb=bin_nb,bin_min=bin_min,bin_max=bin_max,
+                                    bins=bins,
+                                    bin_nb=cls_nb,bin_min=bin_min,bin_max=bin_max,
                                     save_in_obs=save_in_obs,
                                   )
         # split train test
@@ -73,41 +68,7 @@ class scBERTPostprocessor:
     ##############################################################################################################
     #  tokenize steps for scBERT
     #############################################################################################################
-    def extend_vocab(self,adata,var_idx,obs_idx)->AnnData:
-        """
-        extend data to vocab size and sort as vocab order
-        Args:
-            loc: anndata object location
-            translate: if True, translate anndata from other source into scLLM format
-            var_idx: if translate is True, var_idx is the name of gene name colume in anndata.var object
-            obs_idx: if translate is True, obs_idx is the name of label colume in anndata.obs object
-        """
 
-        assert var_idx is not None, "var_idx is None"
-        assert obs_idx is not None, "obs_idx is None"
-        vocab = self.vocab.to_itos()
-        counts = lil_matrix((adata.shape[0],len(vocab)),dtype=np.float32)
-        logger.debug(f"create sparse matrix with shape:{counts.shape}")
-        gene_list = adata.var[var_idx].to_list()
-        logger.debug(f"In original adata with gene {len(gene_list)}")
-        for i in range(len(vocab)):
-            if i % 2000 == 0: logger.debug(f"processing {i}/{len(vocab)}")
-            if vocab[i] in gene_list:
-                mask = (adata.var[var_idx]==vocab[i])
-                if mask.to_list().count(True) > 1:
-                    logger.warn(f"gene {vocab[i]} has more than one columes, mix them up with mean()")
-                    counts[:,i] = adata.X[:,mask].mean(axis=1)
-                else:
-                    counts[:,i] = adata.X[:,mask]
-            counts = counts.tocsr()
-            obs = adata.obs[obs_idx].to_frame() # can only accept dataframe
-            logger.info(f"create anndata in scBERT format..")
-            new = ad.AnnData(X=counts)
-            new.var_names = vocab
-            new.obs = obs
-            new.obs_names = adata.obs_names
-            logger.debug(f"restore anndata in scBERT format..")
-            return new
     def to_data(self,adata,data_type:str):
         """
         Get processed data from AnnData object
@@ -116,20 +77,20 @@ class scBERTPostprocessor:
         Returns:
             processed data in sparse matrix format
         """
-        data_type_list = ["X","normed","log1p","binned"]
+        data_type_list = ["X","X_normed","X_log1p","X_binned"]
         assert data_type in data_type_list, f"data_type must be in {data_type_list}"
         if data_type == "X":
-            if self.para.result_normed_key is not None: 
-                logger.warning(f"X is not normalised, check layer {self.para.result_normed_key}")
-            if self.para.result_log1p_key is not None:
-                logger.warning(f"X is not log1p transformed, check layer {self.para.result_log1p_key}")
-            if self.para.result_binned_key is not None:
-                logger.warning(f"X is not binned, check layer {self.para.result_binned_key}")
+            if self.paras.result_normed_key is not None: 
+                logger.warning(f"X is not normalised, check layer {self.paras.result_normed_key}")
+            if self.paras.result_log1p_key is not None:
+                logger.warning(f"X is not log1p transformed, check layer {self.paras.result_log1p_key}")
+            if self.paras.result_binned_key is not None:
+                logger.warning(f"X is not binned, check layer {self.paras.result_binned_key}")
             return adata.X
         else:
-            name_dict = {"normed":self.para.result_normed_key,
-                        "log1p":self.para.result_log1p_key,
-                        "binned":self.para.result_binned_key}
+            name_dict = {"X_normed":self.paras.result_normed_key,
+                        "X_log1p":self.paras.result_log1p_key,
+                        "X_binned":self.paras.result_binned_key}
             data_type_name = name_dict[data_type]
             all_counts = (
                     adata.layers[data_type_name].A
@@ -201,7 +162,7 @@ class scBERTPostprocessor:
         label = torch.from_numpy(np_label).unsqueeze(1)
         return label,class_weight
 
-    def split_train_valid(self,all_data,all_label,
+    def split_train_test(self,all_data,all_label,
                           n_splits=1, test_size=0.2, random_state=2023):
         from sklearn.model_selection import train_test_split, ShuffleSplit, StratifiedShuffleSplit, StratifiedKFold
         #skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=2023)
@@ -244,9 +205,9 @@ class scGPTPostprocessor:
         self.pad_value= paras.pad_value
 
         
-    def __call__(self,adata:AnnData,
+    def run(self,adata:AnnData,
                  ):
-        input_layer_key = self.para.data_type
+        input_layer_key = self.para.data_layer_name
         test_size = self.para.test_size
         shuffle = self.para.shuffle
         sort_seq_batch = self.para.sort_seq_batch
@@ -254,7 +215,7 @@ class scGPTPostprocessor:
         matrixs = self.extend_to_matrixs(adata,input_layer_key)
 
         # split train valid
-        D_train,D_val = self.split_train_valid(matrixs, test_size=test_size, shuffle=shuffle)
+        D_train,D_val = self.split_train_test(matrixs, test_size=test_size, shuffle=shuffle)
 
         # prepare data
         train_data_pt = self.prepare_data(D_train,sort_seq_batch=sort_seq_batch)
@@ -263,7 +224,7 @@ class scGPTPostprocessor:
         # create dataset
         train_dataset = self.create_dataset(train_data_pt)
         valid_dataset = self.create_dataset(valid_data_pt)
-        return train_dataset,valid_dataset
+        return train_dataset,valid_dataset,None
     ##############################################################################################################
     #  tokenize steps for scGPT
     #############################################################################################################
@@ -287,7 +248,7 @@ class scGPTPostprocessor:
         return [all_counts, celltypes_labels, num_types, batch_ids, num_batch_types]
 
 
-    def split_train_valid(self,matrixs, test_size=0.1, shuffle=True):
+    def split_train_test(self,matrixs, test_size=0.1, shuffle=True):
         [all_counts, celltypes_labels, num_types, batch_ids, num_batch_types] = matrixs
         from sklearn.model_selection import train_test_split
         (
