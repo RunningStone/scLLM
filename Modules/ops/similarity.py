@@ -1,8 +1,8 @@
 import torch.nn as nn
 
-from scLLM.Modules.ops.base import BaseLayers
+from scLLM.Modules.ops.base import BasicOps
 
-class CosineSimilarity_div_temp(nn.Module,BaseLayers):
+class CosineSimilarity_div_temp(nn.Module,BasicOps):
     """
     Dot product or cosine similarity
     """
