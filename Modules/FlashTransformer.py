@@ -17,7 +17,7 @@ from scLLM.Modules.layers.base import BaseLayers
 from scLLM.Modules.layers.gene_encoder import GeneNNEncoder,ContinuousValueEncoder
 from scLLM.Modules.layers.gene_encoder import CategoryValueEncoder,BatchLabelEncoder
 from scLLM.Modules.layers.gene_decoder import ExprDecoder,ClsDecoder
-from scLLM.Models.scGPT.utils import tensorlist2tensor
+from scLLM.Modules.utils import tensorlist2tensor
 
 class FlashTransformer(nn.Module,BaseLayers):
     def __init__(
@@ -49,9 +49,10 @@ class FlashTransformer(nn.Module,BaseLayers):
         pre_norm: bool = False,
 
         **kwargs # for ops
-    ):
+    ):  
         nn.Module.__init__(self,)
         BaseLayers.__init__(self,**kwargs)
+
 
         logger.debug(f"init FlashTransformer module")
 
@@ -153,8 +154,8 @@ class FlashTransformer(nn.Module,BaseLayers):
 
         self.sim = self.ops.CosineSimilarity_div_temp(temp=0.5)  
         self.creterion_cce = nn.CrossEntropyLoss()
-
         self.init_weights()
+        
 
     def init_weights(self) -> None:
         initrange = 0.1

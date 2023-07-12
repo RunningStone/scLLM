@@ -52,6 +52,7 @@ class GeneNNEncoder(nn.Module,BaseLayers):
     ):
         nn.Module.__init__(self,)
         BaseLayers.__init__(self,**kwargs)
+        logger.debug(f"GeneNNEncoder initialised with {num_embeddings}, dim {embedding_dim}, padding_idx {padding_idx}")
         self.embedding = self.ops.Embedding(
             num_embeddings, embedding_dim, padding_idx=padding_idx
         )

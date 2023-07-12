@@ -56,16 +56,15 @@ class Dataset_para:
     return_pt: bool = True
     append_cls: bool = True
     include_zero_gene: bool = False
-    cls_id: int = "<cls>"
+    cls_token: str = "<cls>"
     #----> add pad
     max_len: int = 16000
     pad_token: str = "<pad>"
-    pad_value: int = 0
+    pad_value: int = -2
     cls_appended: bool = True
     #----> mask
     mask_ratio: float = 0.15
     mask_value: int = -1
-    pad_value: int = 0
 
     #--------> data saving steps
     preprocessed_loc: str = None
@@ -73,6 +72,7 @@ class Dataset_para:
     #--------> dataset steps
     data_layer_name:str = "X_log1p" # "X","X_normed","X_binned","X_log1p"
     label_key: str=None
+    batch_label_key: str=None
     # number of categories for classification
     cls_nb:int = None
     #-> for binarize label

@@ -32,3 +32,6 @@ class scGPT_para:
     use_fast_transformer: bool = False
     fast_transformer_backend: str = "flash"
     pre_norm: bool = False
+
+    #--> specified ops
+    ops_class_name:list = ["custom_norm","flash_attention"]

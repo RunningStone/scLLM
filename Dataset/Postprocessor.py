@@ -17,7 +17,7 @@ from scLLM.Dataset.Vocab import GeneVocab
 class scBERTPostprocessor:
     def __init__(self,paras:Dataset_para,vocab:GeneVocab) -> None:
         self.paras = paras
-        self.vocab = vocab
+        self.my_vocab = vocab
 
     def run(self,
                  adata,
@@ -187,13 +187,14 @@ class scBERTPostprocessor:
 ###################################################################
 class scGPTPostprocessor:
     def __init__(self,paras:Dataset_para,vocab:GeneVocab):
+        self.para = paras
         # tokenizer
         self.return_pt = paras.return_pt
         self.append_cls= paras.append_cls
         self.include_zero_gene= paras.include_zero_gene
-        self.cls_id= paras.cls_id
+        self.cls_token= paras.cls_token
         # pad
-        self.vocab= vocab
+        self.my_vocab= vocab
 
         self.max_len= paras.max_len
         self.pad_token= paras.pad_token
@@ -204,6 +205,17 @@ class scGPTPostprocessor:
         self.mask_value= paras.mask_value
         self.pad_value= paras.pad_value
 
+        self.init_special_tokens()
+
+    def init_special_tokens(self):
+        # special token
+        self.special_tokens = [self.pad_token,self.cls_token,"<eoc>"]
+        for s in self.special_tokens:
+            if s not in self.my_vocab:
+                self.my_vocab.append_token(s)
+
+        self.cls_id = self.my_vocab.vocab[self.cls_token]
+
         
     def run(self,adata:AnnData,
                  ):
@@ -213,13 +225,13 @@ class scGPTPostprocessor:
         sort_seq_batch = self.para.sort_seq_batch
         # extend to matrixs
         matrixs = self.extend_to_matrixs(adata,input_layer_key)
-
+        exist_genes = adata.var_names.tolist()
         # split train valid
         D_train,D_val = self.split_train_test(matrixs, test_size=test_size, shuffle=shuffle)
 
         # prepare data
-        train_data_pt = self.prepare_data(D_train,sort_seq_batch=sort_seq_batch)
-        valid_data_pt = self.prepare_data(D_val,sort_seq_batch=sort_seq_batch)
+        train_data_pt = self.prepare_data(D_train,gene_list=exist_genes,sort_seq_batch=sort_seq_batch)
+        valid_data_pt = self.prepare_data(D_val,gene_list=exist_genes,sort_seq_batch=sort_seq_batch)
 
         # create dataset
         train_dataset = self.create_dataset(train_data_pt)
@@ -236,8 +248,8 @@ class scGPTPostprocessor:
             else adata.layers[input_layer_key]
         )
         #genes = adata.var["gene_name"].tolist()
-
-        celltypes_labels = adata.obs["celltype"].tolist()  # make sure count from 0
+        cell_type_index = self.para.label_key
+        celltypes_labels = adata.obs[cell_type_index].tolist()  # make sure count from 0
         num_types = len(set(celltypes_labels))
         celltypes_labels = np.array(celltypes_labels)
 
@@ -264,24 +276,27 @@ class scGPTPostprocessor:
 
     def prepare_data(self,
                      D,
+                     gene_list,
                      sort_seq_batch=False) -> Tuple[Dict[str, torch.Tensor]]:
         [data, celltype_labels, batch_labels] = D
         # from vocab to gene_id numpy array
-        torch_vocab_item = self.vocab.to_torchtext_vocab()
-        gene_ids = np.array(torch_vocab_item, dtype=int)
+        self.my_vocab.set_default_index(self.my_vocab.vocab[self.pad_token])
+        #gene_list= self.my_vocab.get_itos()
+        #follows https://stackoverflow.com/questions/69015430/typeerror-vocab-object-is-not-callable to change
+        #gene_ids = np.array(torch_vocab_item(gene_list), dtype=int)
+        gene_ids = np.array(self.my_vocab.vocab.lookup_indices(gene_list), dtype=int)
+        
 
         # 
         tokenized_data = self.tokenize_and_pad_batch(data,gene_ids)
 
         masked_values_train = self.random_mask_value(
             tokenized_data["values"],
-            mask_ratio=self.mask_ratio,
-            mask_value=self.mask_value,
-            pad_value=self.pad_value,
+
         )
+        show_txt = (masked_values_train == self.mask_value).sum() / (masked_values_train - self.pad_value).count_nonzero()
         logger.info(
-            f"random masking at current epoch, ratio of masked values in train: ",
-            f"{(masked_values_train == self.mask_value).sum() / (masked_values_train - self.pad_value).count_nonzero():.4f}",
+            f"random masking at current epoch, ratio of masked values in train: {show_txt}"
         )
         input_gene_ids_train = tokenized_data["genes"]
         input_values_train = masked_values_train
@@ -373,7 +388,7 @@ class scGPTPostprocessor:
         Returns:
             Dict[str, torch.Tensor]: A dictionary of gene_id and count.
         """
-        vocab = self.vocab.to_torchtext_vocab()
+        vocab = self.my_vocab.to_torchtext_vocab()
         pad_id = vocab[self.pad_token]
         gene_ids_list = []
         values_list = []

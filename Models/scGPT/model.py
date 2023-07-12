@@ -7,8 +7,11 @@ from scLLM.Modules.utils import  Always
 from scLLM.Modules.init import APEX_AVAILABLE
 from scLLM.Models.scGPT.paras import scGPT_para
 from scLLM.Modules.FlashTransformer import FlashTransformer
+
+
 class scGPT_model(nn.Module):
     def __init__(self,paras:scGPT_para) -> None:
+        super().__init__()
         self.paras = paras
         self.net = FlashTransformer(
             ntoken=paras.ntoken,
@@ -30,7 +33,7 @@ class scGPT_model(nn.Module):
             do_dab=paras.do_dab,
 
             use_batch_labels=paras.use_batch_labels,
-            num_batch_labels=paras.num_batch_types,
+            num_batch_labels=paras.num_batch_labels,
             domain_spec_batchnorm=paras.domain_spec_batchnorm, 
 
             input_emb_style=paras.input_emb_style,
@@ -45,7 +48,11 @@ class scGPT_model(nn.Module):
             fast_transformer_backend=paras.fast_transformer_backend,
 
             pre_norm=paras.pre_norm,
+
+            # specified ops
+            ops_class_name=paras.ops_class_name,
         )
+        
 
     def forward(self,
                 input_gene_ids,input_values,

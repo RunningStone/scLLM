@@ -8,8 +8,9 @@ class CosineSimilarity_div_temp(nn.Module,BasicOps):
     """
 
     def __init__(self, temp,**kwargs):
+        
         nn.Module.__init__(self,)
-        BaseLayers.__init__(self,**kwargs)
+        BasicOps.__init__(self,**kwargs)
         self.temp = temp
         self.cos = nn.CosineSimilarity(dim=-1)
 
