@@ -8,7 +8,7 @@ import math
 
 from typing import Dict, Mapping, Optional, Tuple, Any, Union
 from functools import partial
-from einops import  repeat
+from einops import  repeat,rearrange
 
 import torch
 from torch import nn, Tensor
@@ -237,77 +237,36 @@ class FastAttention(nn.Module):
 ############################################################################################################
 #    flash attention wrapper and layers
 ############################################################################################################
-"""
-Flash attention from https://github.com/HazyResearch/flash-attention 
-required for scGPT
-"""
+#from flash_attn import FlashAttention
+from scLLM.Modules.ops.flash_attn_funcs import FlashAttention
 
-class FlashAttention(nn.Module):
-    def __init__(
-        self,
-        d_model,
-        nhead,
-        batch_first=True,
-        dropout=0.0,
-        layer_norm_eps=1e-5,
-        device=None,
-        dtype=None,
-        ) -> None:
+class FlashMHA(nn.Module):
+
+    def __init__(self, embed_dim, num_heads, bias=True, batch_first=True, attention_dropout=0.0,
+                 causal=False, device=None, dtype=None, **kwargs) -> None:
+        assert batch_first
+        factory_kwargs = {'device': device, 'dtype': dtype}
         super().__init__()
-        try:
-            from flash_attn.flash_attention import FlashMHA
-        except:
-            raise ImportError("Please install flash-attention .")
-        else:
-            factory_kwargs = {"device": device, "dtype": dtype}
-            self.self_attn = FlashMHA(
-                    embed_dim=d_model,
-                    num_heads=nhead,
-                    batch_first=batch_first,
-                    attention_dropout=dropout,
-                    device=device,
-                    dtype=dtype,
-                )
-            self.norm1 = nn.LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
-            self.norm2 = nn.LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
-            self.dropout1 = nn.Dropout(dropout)
+        self.embed_dim = embed_dim
+        self.causal = causal
 
-    def forward(
-        self,
-        qkv: Tensor,
-        src_mask: Optional[Tensor] = None,
-        src_key_padding_mask: Optional[Tensor] = None,
-        ) -> Tensor:
-        r"""Pass the input through the encoder layer.
+        self.num_heads = num_heads
+        assert self.embed_dim % num_heads == 0, "self.kdim must be divisible by num_heads"
+        self.head_dim = self.embed_dim // num_heads
+        assert self.head_dim % 8 == 0 and self.head_dim <= 128, "Only support head_dim <= 128 and divisible by 8"
 
-        Args:
-            qkv: qkv: The tensor containing the query, key, and value. (B, S, 3, H, D) if key_padding_mask is None
-                if unpadded: (nnz, 3, h, d) : it is the sequence to the encoder layer (required).
-            src_mask: the mask for the src sequence (optional).
-            src_key_padding_mask: the mask for the src keys per batch (optional).
+        self.Wqkv = nn.Linear(embed_dim, 3 * embed_dim, bias=bias, **factory_kwargs)
+        self.inner_attn = FlashAttention(attention_dropout=attention_dropout, **factory_kwargs)
+        #torch.nn.functional.scaled_dot_product_attention(attention_dropout=attention_dropout, **factory_kwargs)
+        self.out_proj = nn.Linear(embed_dim, embed_dim, bias=bias, **factory_kwargs)
 
-        Shape:
-            see the docs in Transformer class.
+    def forward(self, x, key_padding_mask=None, need_weights=False):
+        """x: (batch, seqlen, hidden_dim) (where hidden_dim = num heads * head dim)
+        key_padding_mask: bool tensor of shape (batch, seqlen)
         """
-        if src_mask is not None:
-            raise ValueError("FlashTransformerEncoderLayer does not support src_mask")
-
-        if not src_key_padding_mask.any().item():
-            # no padding tokens in src
-            src_key_padding_mask_ = None
-        else:
-            # NOTE: the FlashMHA uses mask 0 for padding tokens, which is the opposite
-            src_key_padding_mask_ = ~src_key_padding_mask
-
-        if self.norm_scheme == "pre":
-            src = self.norm1(qkv)
-            src2 = self.self_attn(src, key_padding_mask=src_key_padding_mask_)[0]
-            src = src + self.dropout1(src2)
-            src = self.norm2(src)
-
-        else:
-            src2 = self.self_attn(qkv, key_padding_mask=src_key_padding_mask_)[0]
-            src = qkv + self.dropout1(src2)
-            src = self.norm1(src)
-
-        return src
+        qkv = self.Wqkv(x)
+        qkv = rearrange(qkv, 'b s (three h d) -> b s three h d', three=3, h=self.num_heads)
+        # 
+        context, attn_weights = self.inner_attn(qkv, key_padding_mask=key_padding_mask,
+                                                need_weights=need_weights, causal=self.causal)
+        return self.out_proj(rearrange(context, 'b s h d -> b s (h d)')), attn_weights

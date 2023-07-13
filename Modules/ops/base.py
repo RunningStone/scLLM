@@ -15,7 +15,7 @@ peft_supported_methods = ["peft_lora","custom_norm","fast_attention"]
 class BasicOps:
     def __init__(self,
                 ops_class_name:list=["custom_norm","fast_attention"],
-                ops_class_para:list=[None,None],
+                ops_class_para:list=[None,None,None],
                 ) -> None:
         """
         BasicOps is a class that contains all the basic operations in torch.nn and some customized operations
@@ -37,6 +37,7 @@ class BasicOps:
         #-----> bind customised ops:
         if self.ops_class_name is not None:
             for name,para in zip(self.ops_class_name,self.ops_class_para):
+                #logger.debug(f"bind {name} to self")
                 self.bind_method(name,para)
 
         
@@ -63,11 +64,13 @@ class BasicOps:
             from scLLM.Modules.ops.similarity import CosineSimilarity_div_temp
             self.LocalAttention = LocalAttention
             self.FastAttention = FastAttention
-        elif name == "flash_attention":
-            from scLLM.Modules.ops.attention_funcs import FlashAttention
+            self.CosineSimilarity_div_temp = CosineSimilarity_div_temp
+            # flash attention is a special case of fast attention
+            from scLLM.Modules.ops.attention_funcs import FlashAttention,FlashMHA
             from scLLM.Modules.ops.similarity import CosineSimilarity_div_temp
             self.FlashAttention = FlashAttention
             self.CosineSimilarity_div_temp = CosineSimilarity_div_temp
+            self.FlashMHA = FlashMHA
         else:
             raise NotImplementedError
     

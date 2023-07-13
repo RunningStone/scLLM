@@ -19,6 +19,7 @@ class scGPT_para:
     pad_value: int = 0
     do_mvc: bool = False #config.GEPC,
     do_dab: bool = False
+    dab_weight: float = 1.0
     use_batch_labels: bool = False
     num_batch_labels: Optional[int] = None
     domain_spec_batchnorm: Union[bool, str] = False #config.DSBN

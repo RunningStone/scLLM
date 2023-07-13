@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch import Tensor
 from typing import  Union, Dict
 
+from scLLM import logger
 from scLLM.Modules.sequence.reversible import grad_reverse
 from scLLM.Modules.layers.base import BaseLayers
 
@@ -32,6 +33,7 @@ class ClsDecoder(nn.Module,BaseLayers):
             self._decoder.append(activation())
             self._decoder.append(self.ops.LayerNorm(d_model))
         self.out_layer = self.ops.Linear(d_model, n_cls)
+        logger.debug(f"decoder is built")
 
     def forward(self, x: Tensor) -> Tensor:
         """
@@ -114,6 +116,7 @@ class MVCDecoder(nn.Module,BaseLayers):
         self.arch_style = arch_style
         self.do_detach = arch_style.endswith("detach")
         self.explicit_zero_prob = explicit_zero_prob
+        logger.debug(f"MVCdecoder is built")
 
     def forward(
         self, cell_emb: Tensor, gene_embs: Tensor
@@ -180,6 +183,7 @@ class AdversarialDiscriminator(nn.Module,BaseLayers):
             self._decoder.append(self.ops.LayerNorm(d_model))
         self.out_layer = self.ops.Linear(d_model, n_cls)
         self.reverse_grad = reverse_grad
+        logger.debug(f"AdversarialDiscriminator is built")
 
     def forward(self, x: Tensor) -> Tensor:
         """
@@ -220,6 +224,7 @@ class ExprDecoder(nn.Module,BaseLayers):
                 self.ops.LeakyReLU(),
                 self.ops.Linear(d_model, 1),
             )
+        logger.debug(f"ExprDecoder is built")
 
     def forward(self, x: Tensor) -> Dict[str, Tensor]:
         """x is the output of the transformer, (batch, seq_len, d_model)"""
