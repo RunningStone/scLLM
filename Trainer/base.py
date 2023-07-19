@@ -108,8 +108,8 @@ class pl_basic(pl.LightningModule):
             from pytorch_lightning.callbacks import ModelCheckpoint
             # init ckpt related paras
             ckpt_paras = self.trainer_paras.ckpt_para
-            ckpt_name = self.trainer_paras.exp_name+self.trainer_paras.ckpt_format
-            ckpt_dir = self.trainer_paras.ckpt_folder
+            ckpt_name = self.trainer_paras.ckpt_format
+            ckpt_dir = self.trainer_paras.ckpt_folder+self.trainer_paras.exp_name+"/"
             logger.debug(f"for exp {self.trainer_paras.exp_name} \
                                         Checkpoint with paras {ckpt_paras}")
             checkpoint_callback = ModelCheckpoint(dirpath=ckpt_dir,

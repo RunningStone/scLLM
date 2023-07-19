@@ -48,6 +48,13 @@ class FlashTransformer(nn.Module,BaseLayers):
         fast_transformer_backend: str = "flash",
         pre_norm: bool = False,
 
+        # for forward which following part to get results or targets
+        CLS: bool = False,
+        CCE: bool = False,
+        MVC: bool = False,
+        ECS: bool = False,
+        do_sample: bool = False,
+
         **kwargs # for ops
     ):  
         nn.Module.__init__(self,)
@@ -74,6 +81,12 @@ class FlashTransformer(nn.Module,BaseLayers):
             )
         if cell_emb_style not in ["cls", "avg-pool", "w-pool"]:
             raise ValueError(f"Unknown cell_emb_style: {cell_emb_style}")
+        #---------> flags for forward step
+        self.CLS = CLS
+        self.CCE = CCE
+        self.MVC = MVC
+        self.ECS = ECS
+        self.do_sample = do_sample
 
         #------> init layers
         # TODO: add dropout in the GeneEncoder
@@ -324,11 +337,7 @@ class FlashTransformer(nn.Module,BaseLayers):
         values: Tensor,
         src_key_padding_mask: Tensor,
         batch_labels: Optional[Tensor] = None,
-        CLS: bool = False,
-        CCE: bool = False,
-        MVC: bool = False,
-        ECS: bool = False,
-        do_sample: bool = False,
+
     ) -> Mapping[str, Tensor]:
         """
         Args:
@@ -368,7 +377,7 @@ class FlashTransformer(nn.Module,BaseLayers):
             ),
             # else transformer_output + batch_emb.unsqueeze(1),
         )
-        if self.explicit_zero_prob and do_sample:
+        if self.explicit_zero_prob and self.do_sample:
             bernoulli = Bernoulli(probs=mlm_output["zero_probs"])
             output["mlm_output"] = bernoulli.sample() * mlm_output["pred"]
         else:
@@ -379,9 +388,9 @@ class FlashTransformer(nn.Module,BaseLayers):
         cell_emb = self._get_cell_emb_from_layer(transformer_output, values)
         output["cell_emb"] = cell_emb
 
-        if CLS:
+        if self.CLS:
             output["cls_output"] = self.cls_decoder(cell_emb)  # (batch, n_cls)
-        if CCE:
+        if self.CCE:
             cell1 = cell_emb
             transformer_output2 = self._encode(
                 src, values, src_key_padding_mask, batch_labels
@@ -411,7 +420,7 @@ class FlashTransformer(nn.Module,BaseLayers):
             cos_sim = self.sim(cell1.unsqueeze(1), cell2.unsqueeze(0))  # (batch, batch)
             labels = torch.arange(cos_sim.size(0)).long().to(cell1.device)
             output["loss_cce"] = self.creterion_cce(cos_sim, labels)
-        if MVC:
+        if self.MVC:
             mvc_output = self.mvc_decoder(
                 cell_emb
                 if not self.use_batch_labels
@@ -419,14 +428,14 @@ class FlashTransformer(nn.Module,BaseLayers):
                 # else cell_emb + batch_emb,
                 self.cur_gene_token_embs,
             )
-            if self.explicit_zero_prob and do_sample:
+            if self.explicit_zero_prob and self.do_sample:
                 bernoulli = Bernoulli(probs=mvc_output["zero_probs"])
                 output["mvc_output"] = bernoulli.sample() * mvc_output["pred"]
             else:
                 output["mvc_output"] = mvc_output["pred"]  # (batch, seq_len)
             if self.explicit_zero_prob:
                 output["mvc_zero_probs"] = mvc_output["zero_probs"]
-        if ECS:
+        if self.ECS:
             # Here using customized cosine similarity instead of F.cosine_similarity
             # to avoid the pytorch issue of similarity larger than 1.0, pytorch # 78064
             # normalize the embedding
@@ -531,6 +540,12 @@ class TransformerGenerator(nn.Module):
         use_fast_transformer: bool = False,
         fast_transformer_backend: str = "flash",
         pre_norm: bool = False,
+
+        CLS: bool = False,
+        CCE: bool = False,
+        MVC: bool = False,
+        ECS: bool = False,
+        do_sample: bool = False,
     ):
         super().__init__()
         self.model_type = "Transformer"
@@ -545,6 +560,14 @@ class TransformerGenerator(nn.Module):
         self.norm_scheme = "pre" if pre_norm else "post"
         if cell_emb_style not in ["cls", "avg-pool", "w-pool"]:
             raise ValueError(f"Unknown cell_emb_style: {cell_emb_style}")
+        #---------> flags for forward step
+        self.CLS = CLS
+        self.CCE = CCE
+        self.MVC = MVC
+        self.ECS = ECS
+        self.do_sample = do_sample
+
+
 
         self.encoder = GeneNNEncoder(ntoken, d_model, padding_idx=vocab[pad_token])
         self.value_encoder = ContinuousValueEncoder(d_model, dropout)
@@ -650,11 +673,7 @@ class TransformerGenerator(nn.Module):
         values: Tensor,
         input_pert_flags: Tensor,
         src_key_padding_mask: Tensor,
-        CLS: bool = False,
-        CCE: bool = False,
-        MVC: bool = False,
-        ECS: bool = False,
-        do_sample: bool = False,
+
     ) -> Mapping[str, Tensor]:
         """
         Args:
@@ -692,9 +711,9 @@ class TransformerGenerator(nn.Module):
             output["mlm_zero_probs"] = mlm_output["zero_probs"]
 
         cell_emb = self._get_cell_emb_from_layer(transformer_output, values)
-        if CLS:
+        if self.CLS:
             output["cls_output"] = self.cls_decoder(cell_emb)  # (batch, n_cls)
-        if MVC:
+        if self.MVC:
             mvc_output = self.mvc_decoder(
                 cell_emb,
                 self.cur_gene_token_embs,
@@ -706,7 +725,7 @@ class TransformerGenerator(nn.Module):
                 output["mvc_output"] = mvc_output["pred"]  # (batch, seq_len)
             if self.explicit_zero_prob:
                 output["mvc_zero_probs"] = mvc_output["zero_probs"]
-        if ECS:
+        if self.ECS:
             # Here using customized cosine similarity instead of F.cosine_similarity
             # to avoid the pytorch issue of similarity larger than 1.0, pytorch # 78064
             # normalize the embedding
@@ -794,11 +813,11 @@ class TransformerGenerator(nn.Module):
                     input_values,
                     input_pert_flags,
                     src_key_padding_mask=src_key_padding_mask,
-                    CLS=False,
-                    CCE=False,
-                    MVC=False,
-                    ECS=False,
-                    do_sample=True,
+                    CLS=self.CLS,
+                    CCE=self.CCE,
+                    MVC=self.MVC,
+                    ECS=self.ECS,
+                    do_sample=self.do_sample,
                 )
             output_values = output_dict["mlm_output"].float()
             pred_gene_values = torch.zeros_like(ori_gene_values)

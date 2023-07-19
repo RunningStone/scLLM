@@ -36,6 +36,8 @@ class Trainer_para:
                      # create instance in pl_basic class with Trainer_para.loss()
     loss_para: dict = None # loss function paras
 
+    additional_loss: list = [] # additional loss fn and paras, each item is a dict {"name":loss_name,"fn":loss_fn,"paras":loss_paras}
+
     clip_grad: int = int(1e6) # clip gradient
 
     #-----> training
@@ -59,7 +61,7 @@ class Trainer_para:
     save_ckpt:bool = True # save checkpoint or not
     
     #debug: try to add formated name to ckpt
-    ckpt_format:str = "_{epoch:02d}-{accuracy_val:.2f}" # check_point format 
+    ckpt_format:str = "{epoch:02d}-{accuracy_val:.2f}" # check_point format 
     ckpt_para = { #-----------> paras for pytorch_lightning.callbacks.ModelCheckpoint
                     "save_top_k":1,
                     "mode":"max",
