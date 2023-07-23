@@ -161,23 +161,33 @@ class scBERTPostprocessor:
                 obs_name = f"{label_key}_binned"
                 adata.obs[obs_name] = binned_label
             np_label = binned_label
+            class_num = np.unique(np_label, return_counts=True)[1].tolist()
+            class_weight = torch.tensor([(1 - (x / sum(class_num))) ** 2 for x in class_num])
+            label = torch.from_numpy(np_label).unsqueeze(1)
         else:
             np_label = original_label.to_numpy()
+            label = torch.from_numpy(np_label).unsqueeze(1)
+            class_weight = None
 
-        class_num = np.unique(np_label, return_counts=True)[1].tolist()
-        class_weight = torch.tensor([(1 - (x / sum(class_num))) ** 2 for x in class_num])
-        label = torch.from_numpy(np_label).unsqueeze(1)
+
         return label,class_weight
 
     def split_train_test(self,all_data,all_label,
                           n_splits=1, test_size=0.2, random_state=2023):
         from sklearn.model_selection import train_test_split, ShuffleSplit, StratifiedShuffleSplit, StratifiedKFold
-        #skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=2023)
-        sss = StratifiedShuffleSplit(n_splits=n_splits, 
-                                     test_size=test_size, 
-                                     random_state=random_state)
+        if self.paras.cls_nb >1:
+            logger.info("Classification task, split with StratifiedShuffleSplit")
+            #skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=2023)
+            sss = StratifiedShuffleSplit(n_splits=n_splits, 
+                                        test_size=test_size, 
+                                        random_state=random_state)
 
-        idx_tr,idx_val = next(iter(sss.split(all_data, all_label)))
+            idx_tr,idx_val = next(iter(sss.split(all_data, all_label)))
+        else:
+            logger.info("Regression task, split with ShuffleSplit")
+            # 使用ShuffleSplit
+            ss = ShuffleSplit(n_splits=5, test_size=0.25, random_state=0)
+            idx_tr,idx_val  = next(iter(ss.split(all_data)))
         data_train, label_train = all_data[idx_tr], all_label[idx_tr]
         data_val, label_val = all_data[idx_val], all_label[idx_val]
         return [data_train,label_train],[data_val,label_val]

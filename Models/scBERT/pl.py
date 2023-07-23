@@ -32,28 +32,35 @@ class pl_scBERT(pl_basic):
         data preprocess
         """
         data, label = batch
-        label = label.squeeze(0)
+        label = label.squeeze(0).float()
         return data, label
 
     def train_post_process(self,logits,label,loss):
         """
         post process
         """
-        #---->metrics step
-        softmax = nn.Softmax(dim=-1)
-        prob = softmax(logits)
-        final = prob.argmax(dim=-1)
-        out = {"logits":logits,"Y_prob":prob,
-               "Y_hat":final,"label":label,
-               "loss":loss}
-        return out
+        if self.trainer_paras.task_type == "classification":
+            #---->metrics step
+            softmax = nn.Softmax(dim=-1)
+            prob = softmax(logits)
+            final = prob.argmax(dim=-1)
+            out = {"logits":logits,"Y_prob":prob,
+                "Y_hat":final,"label":label,
+                "loss":loss}
+            return out
+        elif self.trainer_paras.task_type == "regression":
+            #---->metrics step
+            out = {"logits":logits.squeeze(0),
+                   "label":label,
+                "loss":loss}
+            return out
 
     def val_data_preprocess(self,batch):
         """
         data preprocess
         """
         data, label = batch
-        label = label.squeeze(0)
+        label = label.squeeze(0).float()
         return data, label
 
     def val_post_process(self,logits,label,loss):
@@ -61,37 +68,64 @@ class pl_scBERT(pl_basic):
         post process
         """
         #---->metrics step
-        softmax = nn.Softmax(dim=-1)
-        prob = softmax(logits)
-        final = prob.argmax(dim=-1)
-        out = {"logits":logits,"Y_prob":prob,
-               "Y_hat":final,"label":label,
-               "loss":loss}
-        return out
+        if self.trainer_paras.task_type == "classification":
+            #---->metrics step
+            softmax = nn.Softmax(dim=-1)
+            prob = softmax(logits)
+            final = prob.argmax(dim=-1)
+            out = {"logits":logits,"Y_prob":prob,
+                "Y_hat":final,"label":label,
+                "loss":loss}
+            return out
+        elif self.trainer_paras.task_type == "regression":
+            #---->metrics step
+            out = {"logits":logits.squeeze(0),
+                   "label":label,
+                "loss":loss}
+            return out
 
     ####################################################################
     #              what to log
     ####################################################################
     def log_val_metrics(self,outlist,bar_name:str):
-        probs = self.collect_step_output(key="Y_prob",out=outlist,dim=0)
-        max_probs = self.collect_step_output(key="Y_hat",out=outlist,dim=0)
-        target = self.collect_step_output(key="label",out=outlist,dim=0)
-        #----> log part
-        self.log(bar_name, self.bar_metrics(probs, target.squeeze()), 
-                            prog_bar=True, on_epoch=True, logger=True)
-        self.log_dict(self.valid_metrics(max_probs.squeeze() , target.squeeze()),
-                          on_epoch = True, logger = True)
+        if self.trainer_paras.task_type == "classification":
+            probs = self.collect_step_output(key="Y_prob",out=outlist,dim=0)
+            max_probs = self.collect_step_output(key="Y_hat",out=outlist,dim=0)
+            target = self.collect_step_output(key="label",out=outlist,dim=0)
+            #----> log part
+            self.log(bar_name, self.bar_metrics(probs, target.squeeze()), 
+                                prog_bar=True, on_epoch=True, logger=True)
+            self.log_dict(self.valid_metrics(max_probs.squeeze() , target.squeeze()),
+                            on_epoch = True, logger = True)
+        elif self.trainer_paras.task_type == "regression":
+            logits = self.collect_step_output(key="logits",out=outlist,dim=0)
+            target = self.collect_step_output(key="label",out=outlist,dim=0)
+            #----> log part
+            self.log(bar_name, self.bar_metrics(logits, target.squeeze()), 
+                                prog_bar=True, on_epoch=True, logger=True)
+            self.log_dict(self.valid_metrics(logits.squeeze() , target.squeeze()),
+                            on_epoch = True, logger = True)
+        else:
+            raise ValueError(f"task_type {self.trainer_paras.task_type} not supported")
         
     def log_train_metrics(self,outlist,bar_name:str):
-        probs = self.collect_step_output(key="Y_prob",out=outlist,dim=0)
-        max_probs = self.collect_step_output(key="Y_hat",out=outlist,dim=0)
-        target = self.collect_step_output(key="label",out=outlist,dim=0)
-        #----> log part
-        self.log(bar_name, self.bar_metrics(probs, target.squeeze()), 
-                            prog_bar=True, on_epoch=True, logger=True)
-        self.log_dict(self.train_metrics(max_probs.squeeze() , target.squeeze()),
-                          on_epoch = True, logger = True)    
-
+        if self.trainer_paras.task_type == "classification":
+            probs = self.collect_step_output(key="Y_prob",out=outlist,dim=0)
+            max_probs = self.collect_step_output(key="Y_hat",out=outlist,dim=0)
+            target = self.collect_step_output(key="label",out=outlist,dim=0)
+            #----> log part
+            self.log(bar_name, self.bar_metrics(probs, target.squeeze()), 
+                                prog_bar=True, on_epoch=True, logger=True)
+            self.log_dict(self.train_metrics(max_probs.squeeze() , target.squeeze()),
+                            on_epoch = True, logger = True)    
+        elif self.trainer_paras.task_type == "regression":
+            logits = self.collect_step_output(key="logits",out=outlist,dim=0)
+            target = self.collect_step_output(key="label",out=outlist,dim=0)
+            #----> log part
+            self.log(bar_name, self.bar_metrics(logits, target.squeeze()), 
+                                prog_bar=True, on_epoch=True, logger=True)
+            self.log_dict(self.train_metrics(logits.squeeze() , target.squeeze()),
+                            on_epoch = True, logger = True)
 
 
         

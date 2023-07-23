@@ -1,6 +1,7 @@
 import torchmetrics
 
 metrics_dict = {
+    # classification
     "accuracy": torchmetrics.Accuracy,
     "cohen_kappa": torchmetrics.CohenKappa,
     "f1_score": torchmetrics.F1Score,
@@ -11,6 +12,10 @@ metrics_dict = {
     "auroc": torchmetrics.AUROC,
     "roc": torchmetrics.ROC,
     "confusion_matrix": torchmetrics.ConfusionMatrix,
+
+    # regression
+    "MSE":torchmetrics.MeanSquaredError,
+    "CosSim":torchmetrics.CosineSimilarity,
 }
 # older version of torchmetrics 
 metrics_para_dict_old = {
@@ -25,6 +30,10 @@ metrics_para_dict_old = {
     "auroc": {"average": "macro"},
     "roc": {"average": "macro"},
     "confusion_matrix": {"normalize": "true"},
+},
+"regression":{
+    "MSE": {},
+    "CosSim": {"reduction" : 'mean'},
 },
 }
 metrics_para_dict_new= {
@@ -82,8 +91,31 @@ class MetricsFactory:
         metrics_template = torchmetrics.MetricCollection(metrics_fn_list)
         self.metrics["metrics_template"] = metrics_template
 
+
+    def get_metrics_regression(self):
+        """
+        get metrics for classification task
+        """
+        metrics_fn_list = []
+        bar_metrics = self.metrics_names[0]
+        assert bar_metrics in metrics_dict.keys(), f"{bar_metrics} not in metrics_dict"
+        related_paras = self.paras["regression"][bar_metrics]
+        self.metrics["metrics_on_bar"] = metrics_dict[bar_metrics](num_classes =self.n_classes,
+                                                                    **related_paras)
+        for i in range(1,len(self.metrics_names)):
+            name = self.metrics_names[i]
+            related_paras = self.paras["regression"][name]
+            metrics_fn_list.append(
+                                    metrics_dict[name](num_classes =self.n_classes,
+                                                        **related_paras)
+                                    )
+        metrics_template = torchmetrics.MetricCollection(metrics_fn_list)
+        self.metrics["metrics_template"] = metrics_template
+
     def get_metrics(self,task_type:str):
         if task_type == "classification":
             self.get_metrics_classification()
+        elif task_type == "regression":
+            self.get_metrics_regression()
         else:
             raise NotImplementedError
