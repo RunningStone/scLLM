@@ -49,22 +49,29 @@ class scBERTPostprocessor:
                                     bin_nb=cls_nb,bin_min=bin_min,bin_max=bin_max,
                                     save_in_obs=save_in_obs,
                                   )
-        # split train test
-        D_train,D_val = self.split_train_test(all_data,all_label,
-                                              # for how to split
-                                              n_splits=n_splits, 
-                                              test_size=test_size, 
-                                              random_state=random_state,
-                                              )
-        # for train part
-        trainset = self.create_dataset(D_train,
-                                       cls_nb=cls_nb,
-                                       )
-        # for val part
-        valset = self.create_dataset(D_val,
+        if self.paras.test_size is not None:
+            # split train test
+            D_train,D_val = self.split_train_test(all_data,all_label,
+                                                # for how to split
+                                                n_splits=n_splits, 
+                                                test_size=test_size, 
+                                                random_state=random_state,
+                                                )
+            # for train part
+            trainset = self.create_dataset(D_train,
                                         cls_nb=cls_nb,
                                         )
-        return trainset,valset,class_weight
+            # for val part
+            valset = self.create_dataset(D_val,
+                                            cls_nb=cls_nb,
+                                            )
+            return trainset,valset,class_weight
+        else:
+            # for train part
+            trainset = self.create_dataset([all_data,all_label],
+                                        cls_nb=cls_nb,
+                                        )
+            return trainset,None,class_weight
     ##############################################################################################################
     #  tokenize steps for scBERT
     #############################################################################################################
@@ -226,17 +233,25 @@ class scGPTPostprocessor:
         # extend to matrixs
         matrixs = self.extend_to_matrixs(adata,input_layer_key)
         exist_genes = adata.var_names.tolist()
-        # split train valid
-        D_train,D_val = self.split_train_test(matrixs, test_size=test_size, shuffle=shuffle)
 
-        # prepare data
-        train_data_pt = self.prepare_data(D_train,gene_list=exist_genes,sort_seq_batch=sort_seq_batch)
-        valid_data_pt = self.prepare_data(D_val,gene_list=exist_genes,sort_seq_batch=sort_seq_batch)
+        if self.para.test_size is not None:
+            # split train valid
+            D_train,D_val = self.split_train_test(matrixs, test_size=test_size, shuffle=shuffle)
 
-        # create dataset
-        train_dataset = self.create_dataset(train_data_pt)
-        valid_dataset = self.create_dataset(valid_data_pt)
-        return train_dataset,valid_dataset,None
+            # prepare data
+            train_data_pt = self.prepare_data(D_train,gene_list=exist_genes,sort_seq_batch=sort_seq_batch)
+            valid_data_pt = self.prepare_data(D_val,gene_list=exist_genes,sort_seq_batch=sort_seq_batch)
+
+            # create dataset
+            train_dataset = self.create_dataset(train_data_pt)
+            valid_dataset = self.create_dataset(valid_data_pt)
+            return train_dataset,valid_dataset,None
+        else:
+            # prepare data
+            data_pt = self.prepare_data(matrixs,gene_list=exist_genes,sort_seq_batch=sort_seq_batch)
+            # create dataset
+            dataset = self.create_dataset(data_pt)
+            return dataset,None,None
     ##############################################################################################################
     #  tokenize steps for scGPT
     #############################################################################################################
