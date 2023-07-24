@@ -327,7 +327,8 @@ class scGPTPostprocessor:
         input_values_train = masked_values_train
         target_values_train = tokenized_data["values"]
         tensor_batch_labels = torch.from_numpy(batch_labels).long()
-        
+        if celltype_labels is not None:
+            tensor_celltype_labels_train = torch.from_numpy(celltype_labels).long()
 
         if sort_seq_batch:
             train_sort_ids = np.argsort(batch_labels)
@@ -335,6 +336,8 @@ class scGPTPostprocessor:
             input_values_train = input_values_train[train_sort_ids]
             target_values_train = target_values_train[train_sort_ids]
             tensor_batch_labels = tensor_batch_labels[train_sort_ids]
+            if celltype_labels is not None:
+                tensor_celltype_labels_train = tensor_celltype_labels_train[train_sort_ids]
 
 
         data_pt = {
@@ -342,7 +345,11 @@ class scGPTPostprocessor:
             "values": input_values_train,
             "target_values": target_values_train,
             "batch_labels": tensor_batch_labels,
+            
         }
+
+        if celltype_labels is not None:
+            data_pt["celltype_labels"] = tensor_celltype_labels_train
 
         return data_pt
 

@@ -51,6 +51,12 @@ class scGPT_model(nn.Module):
 
             # specified ops
             ops_class_name=paras.ops_class_name,
+            # for forward which following part to get results or targets
+            CLS= paras.CLS,
+            CCE= paras.CCE,
+            MVC= paras.MVC,
+            ECS = paras.ECS,
+            do_sample = paras.do_sample,
         )
         
 
@@ -61,8 +67,6 @@ class scGPT_model(nn.Module):
         output = self.net(input_gene_ids,
                 input_values,
                 src_key_padding_mask=src_key_padding_mask,
-                batch_labels=batch_labels,
-                MVC=self.paras.do_mvc,
-                ECS=self.paras.ecs_threshold > 0,)
+                batch_labels=batch_labels)
         
         return output

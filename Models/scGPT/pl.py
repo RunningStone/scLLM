@@ -72,7 +72,7 @@ class pl_scGPT(pl_basic):
         loss = 0.0
         metrics_to_log = {}
         if self.model_paras.MLM:
-            loss_mse = self.mse_loss_fn(
+            loss_mse = self.loss_fn(
                 output_dict["mlm_output"], target_values, masked_positions
             )
             loss = loss + loss_mse
@@ -151,11 +151,11 @@ class pl_scGPT(pl_basic):
 
     def training_step(self, batch, batch_idx):
         #---->data preprocess
-        input_gene_ids = batch["gene_ids"].to(self.model)#.to(device)
-        input_values = batch["values"].to(self.model)#.to(device)
-        target_values = batch["target_values"].to(self.model)#.to(device)
-        batch_labels = batch["batch_labels"].to(self.model)#.to(device)
-        celltype_labels = batch["celltype_labels"].to(self.model) if  self.model_paras.CLS else None
+        input_gene_ids = batch["gene_ids"]#.to(self.model)#.to(device)
+        input_values = batch["values"]#.to(self.model)#.to(device)
+        target_values = batch["target_values"]#.to(self.model)#.to(device)
+        batch_labels = batch["batch_labels"]#.to(self.model)#.to(device)
+        celltype_labels = batch["celltype_labels"] if  self.model_paras.CLS else None
             
         src_key_padding_mask = input_gene_ids.eq(self.model_paras.vocab[self.model_para.pad_token])
 
@@ -203,11 +203,11 @@ class pl_scGPT(pl_basic):
 
     def validation_step(self, batch, batch_idx):
         #---->data preprocess
-        input_gene_ids = batch["gene_ids"].to(self.model)#.to(device)
-        input_values = batch["values"].to(self.model)#.to(device)
-        target_values = batch["target_values"].to(self.model)#.to(device)
-        batch_labels = batch["batch_labels"].to(self.model)#.to(device)
-        celltype_labels = batch["celltype_labels"].to(self.model) if  self.model_paras.CLS else None
+        input_gene_ids = batch["gene_ids"]#.to(self.model)#.to(device)
+        input_values = batch["values"]#.to(self.model)#.to(device)
+        target_values = batch["target_values"]#.to(self.model)#.to(device)
+        batch_labels = batch["batch_labels"]#.to(self.model)#.to(device)
+        celltype_labels = batch["celltype_labels"] if  self.model_paras.CLS else None
             
         src_key_padding_mask = input_gene_ids.eq(self.model_paras.vocab[self.model_para.pad_token])
 
