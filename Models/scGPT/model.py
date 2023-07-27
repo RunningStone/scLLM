@@ -51,6 +51,7 @@ class scGPT_model(nn.Module):
 
             # specified ops
             ops_class_name=paras.ops_class_name,
+            ops_class_para= paras.ops_class_para,
             # for forward which following part to get results or targets
             CLS= paras.CLS,
             CCE= paras.CCE,
