@@ -55,10 +55,12 @@ class FlashTransformer(nn.Module,BaseLayers):
         ECS: bool = False,
         do_sample: bool = False,
 
-        **kwargs # for ops
+        ops_class_name=None,
+        ops_class_para=None,
     ):  
         nn.Module.__init__(self,)
-        BaseLayers.__init__(self,**kwargs)
+        BaseLayers.__init__(self,ops_class_name=ops_class_name,
+                                  ops_class_para=ops_class_para)
 
 
         logger.debug(f"init FlashTransformer module")
@@ -91,18 +93,23 @@ class FlashTransformer(nn.Module,BaseLayers):
         #------> init layers
         # TODO: add dropout in the GeneEncoder
         self.encoder = GeneNNEncoder(ntoken, d_model, padding_idx=vocab[pad_token],
-                                     **kwargs # for ops
+                                     ops_class_name=ops_class_name,
+                                      ops_class_para=ops_class_para
                                      )
 
         # Value Encoder, NOTE: the scaling style is also handled in _encode method
         if input_emb_style == "continuous":
             self.value_encoder = ContinuousValueEncoder(d_model, dropout,
-                                                        **kwargs # for ops
+                                                        ops_class_name=ops_class_name,
+                                                        ops_class_para=ops_class_para
                                                         )
         elif input_emb_style == "category":
             assert n_input_bins > 0
             self.value_encoder = CategoryValueEncoder(
-                n_input_bins, d_model, padding_idx=pad_value,**kwargs # for ops
+                n_input_bins, d_model, padding_idx=pad_value,
+                # for ops
+                ops_class_name=ops_class_name,
+                ops_class_para=ops_class_para
             )
         else:
             self.value_encoder = nn.Identity()  # nn.Softmax(dim=1)
@@ -112,7 +119,9 @@ class FlashTransformer(nn.Module,BaseLayers):
         # Batch Encoder
         if use_batch_labels:
             self.batch_encoder = BatchLabelEncoder(num_batch_labels, d_model,
-                                                   **kwargs # for ops
+                                                   # for ops
+                                                  ops_class_name=ops_class_name,
+                                                  ops_class_para=ops_class_para
                                                    )
 
         if domain_spec_batchnorm:
@@ -140,6 +149,9 @@ class FlashTransformer(nn.Module,BaseLayers):
                     dropout,
                     batch_first=True,
                     norm_scheme=self.norm_scheme,
+                    # for ops
+                    ops_class_name=ops_class_name,
+                    ops_class_para=ops_class_para
                 )
                 self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
         else:
@@ -152,9 +164,14 @@ class FlashTransformer(nn.Module,BaseLayers):
             d_model,
             explicit_zero_prob=explicit_zero_prob,
             use_batch_labels=use_batch_labels,
-            **kwargs # for ops
+            # for ops
+            ops_class_name=ops_class_name,
+            ops_class_para=ops_class_para
         )
-        self.cls_decoder = ClsDecoder(d_model, n_cls, nlayers=nlayers_cls,**kwargs # for ops
+        self.cls_decoder = ClsDecoder(d_model, n_cls, nlayers=nlayers_cls,
+                                      # for ops
+                                      ops_class_name=ops_class_name,
+                                      ops_class_para=ops_class_para
                                       )
         if do_mvc:
             from scLLM.Modules.layers.gene_decoder import MVCDecoder
@@ -163,7 +180,9 @@ class FlashTransformer(nn.Module,BaseLayers):
                 arch_style=mvc_decoder_style,
                 explicit_zero_prob=explicit_zero_prob,
                 use_batch_labels=use_batch_labels,
-                **kwargs # for ops
+                # for ops
+                ops_class_name=ops_class_name,
+                ops_class_para=ops_class_para
             )
 
         if do_dab:
@@ -172,7 +191,9 @@ class FlashTransformer(nn.Module,BaseLayers):
                 d_model,
                 n_cls=num_batch_labels,
                 reverse_grad=True,
-                **kwargs # for ops
+                # for ops
+                ops_class_name=ops_class_name,
+                ops_class_para=ops_class_para
             )
 
         self.sim = self.ops.CosineSimilarity_div_temp(temp=0.5)  

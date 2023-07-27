@@ -388,9 +388,9 @@ class FlashTransformerEncoderLayer(nn.Module,BaseLayers):
             **factory_kwargs,
         )
         # Implementation of Feedforward model
-        self.linear1 = nn.Linear(d_model, dim_feedforward, **factory_kwargs)
+        self.linear1 = self.ops.Linear(d_model, dim_feedforward, **factory_kwargs)
         self.dropout = nn.Dropout(dropout)
-        self.linear2 = nn.Linear(dim_feedforward, d_model, **factory_kwargs)
+        self.linear2 = self.ops.Linear(dim_feedforward, d_model, **factory_kwargs)
 
         self.norm1 = nn.LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
         self.norm2 = nn.LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)

@@ -1,8 +1,9 @@
 import attr 
 from typing import Dict, Mapping, Optional, Tuple, Any, Union
+from scLLM.Models.init import model_para_base
 
 @attr.s(auto_attribs=True)
-class scGPT_para:
+class scGPT_para(model_para_base):
     # transformer parameters
     #---> mode necessary
     ntoken: int = None
