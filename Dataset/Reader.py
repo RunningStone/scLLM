@@ -225,6 +225,9 @@ class scReader:
         self.adata = self.preprocessor(self.adata,batch_key=batch_key)
 
     def postprocess(self):
+        # check if need to map string labels to int
+        self.map_str_labels_to_int()
+
         if self.para.tokenize_name == "scBERT":
             self.postprocess_worker = scBERTPostprocessor(self.para,self.vocab)
             
@@ -234,3 +237,21 @@ class scReader:
             raise ValueError(f"tokenize_name {self.para.tokenize_name} not supported.")
         train_dataset,valid_dataset,w = self.postprocess_worker.run(self.adata)
         return train_dataset,valid_dataset,w
+    
+    def map_str_labels_to_int(self):
+        """
+        map string labels to int
+        """
+        if self.para.auto_map_str_labels:
+            logger.info(f"Map string labels to int automatically.")
+            # 补充 对于原本就是离散字符标签的数据集，需要map到数字并保存map_dict
+            key_name = self.para.label_key
+            # 把unique的label转化为map_dict
+            name_list = self.adata.obs[key_name].unique().to_list()
+            if self.para.map_dict is None:
+                map_dict = {value: index for index, value in enumerate(name_list)}
+            else:
+                assert len(self.para.map_dict) == len(name_list) # map_dict should have the same length as name_list
+                map_dict = self.para.map_dict
+            logger.info(f"Mapping from {map_dict}")
+            self.adata.obs[key_name]=self.adata.obs[key_name].map(map_dict)
