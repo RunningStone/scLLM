@@ -255,3 +255,4 @@ class scReader:
                 map_dict = self.para.map_dict
             logger.info(f"Mapping from {map_dict}")
             self.adata.obs[key_name]=self.adata.obs[key_name].map(map_dict)
+            self.para.map_dict = map_dict
