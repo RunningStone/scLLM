@@ -20,7 +20,7 @@ trainer_para.ckpt_folder = "//main/PAN/Exp03_scLLM/pre_trained/finetuned/"
 
 #-----> pytorch lightning paras
 trainer_para.trainer_output_dir = "//main/PAN/Exp05_scLLM_PEFT/Temp/" 
-trainer_para.wandb_api_key = "1266ad70f8bf7695542bf9a2d0dec8748c52431c"
+trainer_para.wandb_api_key = "Your API Key"
 
 
 #-----> model paras
