@@ -81,7 +81,7 @@ def train(task_name,code_loc,raw_data_loc,vocab_loc, model_ckpt,vocab_params, ou
                    "monitor":"accuracy_val",
                    "mode":"max",}
     trainer_para.trainer_output_dir = "/home/pan/Experiments/EXPs/scLLM_workspace/Temp/" 
-    trainer_para.wandb_api_key = "1266ad70f8bf7695542bf9a2d0dec8748c52431c"
+    trainer_para.wandb_api_key = "your wandb key"
     #trainer_para.additional_pl_paras.update({"amp_backend":"apex","precision":"16"})#"amp_backend":"apex","precision":"bf16"
     #amp_backend="apex"
 
