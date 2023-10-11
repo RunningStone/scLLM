@@ -72,7 +72,7 @@ class pl_scGPT(pl_basic):
         loss = 0.0
         metrics_to_log = {}
         if self.model_paras.MLM:
-            loss_mse = self.mse_loss_fn(
+            loss_mse = self.loss_fn(
                 output_dict["mlm_output"], target_values, masked_positions
             )
             loss = loss + loss_mse
@@ -141,23 +141,26 @@ class pl_scGPT(pl_basic):
         self.log_dict(metrics_to_log)
         
         if self.model_paras.CLS:
-            output_values = output_dict["cls_output"]
+            prob = torch.softmax(output_dict["cls_output"],dim=1)
+            output_values = torch.argmax(output_dict["cls_output"],dim=1)
             out = {
+                "Y_prob":prob,
                "Y_hat":output_values,"label":celltype_labels,
-               "loss":loss}
+               "loss":loss.unsqueeze(0)}
         else:
-            out = {"loss":loss}
+            out = {"loss":loss.unsqueeze(0)}
+        
         return out
 
     def training_step(self, batch, batch_idx):
         #---->data preprocess
-        input_gene_ids = batch["gene_ids"].to(self.model)#.to(device)
-        input_values = batch["values"].to(self.model)#.to(device)
-        target_values = batch["target_values"].to(self.model)#.to(device)
-        batch_labels = batch["batch_labels"].to(self.model)#.to(device)
-        celltype_labels = batch["celltype_labels"].to(self.model) if  self.model_paras.CLS else None
+        input_gene_ids = batch["gene_ids"]#.to(self.model)#.to(device)
+        input_values = batch["values"]#.to(self.model)#.to(device)
+        target_values = batch["target_values"]#.to(self.model)#.to(device)
+        batch_labels = batch["batch_labels"]#.to(self.model)#.to(device)
+        celltype_labels = batch["celltype_labels"] if  self.model_paras.CLS else None
             
-        src_key_padding_mask = input_gene_ids.eq(self.model_paras.vocab[self.model_para.pad_token])
+        src_key_padding_mask = input_gene_ids.eq(self.model_paras.vocab[self.model_paras.pad_token])
 
         #---->forward step
         with torch.cuda.amp.autocast(enabled=self.model_paras.amp_flag):#enabled=amp_flag):
@@ -193,23 +196,26 @@ class pl_scGPT(pl_basic):
         self.log_dict(metrics_to_log)
         
         if self.model_paras.CLS:
-            output_values = output_dict["cls_output"]
+            prob = torch.softmax(output_dict["cls_output"],dim=1)
+            output_values = torch.argmax(output_dict["cls_output"],dim=1)
             out = {
+                "Y_prob":prob,
                "Y_hat":output_values,"label":celltype_labels,
-               "loss":loss}
+               "loss":loss.unsqueeze(0)}
         else:
-            out = {"loss":loss}
+            out = {"loss":loss.unsqueeze(0)}
+        
         return out
 
     def validation_step(self, batch, batch_idx):
         #---->data preprocess
-        input_gene_ids = batch["gene_ids"].to(self.model)#.to(device)
-        input_values = batch["values"].to(self.model)#.to(device)
-        target_values = batch["target_values"].to(self.model)#.to(device)
-        batch_labels = batch["batch_labels"].to(self.model)#.to(device)
-        celltype_labels = batch["celltype_labels"].to(self.model) if  self.model_paras.CLS else None
+        input_gene_ids = batch["gene_ids"]#.to(self.model)#.to(device)
+        input_values = batch["values"]#.to(self.model)#.to(device)
+        target_values = batch["target_values"]#.to(self.model)#.to(device)
+        batch_labels = batch["batch_labels"]#.to(self.model)#.to(device)
+        celltype_labels = batch["celltype_labels"] if  self.model_paras.CLS else None
             
-        src_key_padding_mask = input_gene_ids.eq(self.model_paras.vocab[self.model_para.pad_token])
+        src_key_padding_mask = input_gene_ids.eq(self.model_paras.vocab[self.model_paras.pad_token])
 
         #---->forward step
         with torch.cuda.amp.autocast(enabled=self.model_paras.amp_flag):#enabled=amp_flag):
@@ -237,7 +243,7 @@ class pl_scGPT(pl_basic):
         max_probs = self.collect_step_output(key="Y_hat",out=outlist,dim=0)
         target = self.collect_step_output(key="label",out=outlist,dim=0)
         #----> log part
-        self.log(bar_name, self.bar_metrics(loss, target.squeeze()), 
+        self.log(bar_name, self.bar_metrics(max_probs, target), 
                             prog_bar=True, on_epoch=True, logger=True)
         self.log_dict(self.valid_metrics(max_probs.squeeze() , target.squeeze()),
                           on_epoch = True, logger = True)
@@ -247,7 +253,7 @@ class pl_scGPT(pl_basic):
         max_probs = self.collect_step_output(key="Y_hat",out=outlist,dim=0)
         target = self.collect_step_output(key="label",out=outlist,dim=0)
         #----> log part
-        self.log(bar_name, self.bar_metrics(loss, target.squeeze()), 
+        self.log(bar_name, self.bar_metrics(max_probs, target), 
                             prog_bar=True, on_epoch=True, logger=True)
         self.log_dict(self.train_metrics(max_probs.squeeze() , target.squeeze()),
                           on_epoch = True, logger = True)    

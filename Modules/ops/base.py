@@ -15,7 +15,7 @@ peft_supported_methods = ["peft_lora","custom_norm","fast_attention"]
 class BasicOps:
     def __init__(self,
                 ops_class_name:list=["custom_norm","fast_attention"],
-                ops_class_para:list=[None,None,None],
+                ops_class_para:list=[None,None],
                 ) -> None:
         """
         BasicOps is a class that contains all the basic operations in torch.nn and some customized operations

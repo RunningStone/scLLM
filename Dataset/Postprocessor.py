@@ -168,7 +168,7 @@ class scBERTPostprocessor:
             np_label = original_label.to_numpy()
             label = torch.from_numpy(np_label).unsqueeze(1)
             class_weight = None
-
+        self.class_weight = class_weight
 
         return label,class_weight
 
@@ -273,10 +273,7 @@ class scGPTPostprocessor:
             else adata.layers[input_layer_key]
         )
         #genes = adata.var["gene_name"].tolist()
-        cell_type_index = self.para.label_key
-        celltypes_labels = adata.obs[cell_type_index].tolist()  # make sure count from 0
-        num_types = len(set(celltypes_labels))
-        celltypes_labels = np.array(celltypes_labels)
+        celltypes_labels,num_types = self.process_labels(adata)
 
         batch_ids = adata.obs["batch_id"].tolist()
         num_batch_types = len(set(batch_ids))
@@ -327,7 +324,8 @@ class scGPTPostprocessor:
         input_values_train = masked_values_train
         target_values_train = tokenized_data["values"]
         tensor_batch_labels = torch.from_numpy(batch_labels).long()
-        
+        if celltype_labels is not None:
+            tensor_celltype_labels_train = torch.from_numpy(celltype_labels).long()
 
         if sort_seq_batch:
             train_sort_ids = np.argsort(batch_labels)
@@ -335,6 +333,8 @@ class scGPTPostprocessor:
             input_values_train = input_values_train[train_sort_ids]
             target_values_train = target_values_train[train_sort_ids]
             tensor_batch_labels = tensor_batch_labels[train_sort_ids]
+            if celltype_labels is not None:
+                tensor_celltype_labels_train = tensor_celltype_labels_train[train_sort_ids]
 
 
         data_pt = {
@@ -342,7 +342,11 @@ class scGPTPostprocessor:
             "values": input_values_train,
             "target_values": target_values_train,
             "batch_labels": tensor_batch_labels,
+            
         }
+
+        if celltype_labels is not None:
+            data_pt["celltype_labels"] = tensor_celltype_labels_train
 
         return data_pt
 
@@ -497,4 +501,58 @@ class scGPTPostprocessor:
             row[mask_idx] = self.mask_value
         return torch.from_numpy(values).float()
     
-    
+
+    def process_labels(self,adata)->Tuple[np.ndarray,int]:
+        """
+        get label from adata.obs[label_key]
+        if binarize is True, then we will binarize the label
+        if save_in_obs is True, then we will save the label in adata.obs[label_key]
+        Args from function:
+            adata (:class:`anndata.AnnData`):
+                Annotated data matrix.
+        Args from paras:
+            label_key (:class:`str`):
+                The key of :class:`AnnData.obs` to use as label
+            binarize (:class:`str`)(optional): ["quantile",""]
+                If True, we will binarize the label
+        out:
+            celltypes_labels_np: np.ndarray
+                The label of the data
+            num_types: int
+                The number of types
+        """
+        bin_nb = self.para.cls_nb
+        binarize = self.para.binarize # method to binarize label
+        bins = self.para.bins
+        bin_min = self.para.bin_min
+        bin_max = self.para.bin_max
+        cell_type_index = self.para.label_key
+        celltypes_labels = adata.obs[cell_type_index]
+
+        if binarize is not None:
+            assert binarize in ["equal_width","equal_instance"]
+            if bins is None:
+                assert bin_nb is not None 
+                if bin_min is None: bin_min = celltypes_labels.min()
+                if bin_max is None: bin_max = celltypes_labels.max()
+                if binarize == "equal_width":
+                    bins = np.linspace(bin_min, bin_max, bin_nb)
+                elif binarize == "equal_instance":
+                    c_label = np.sort(celltypes_labels.to_numpy().flatten())
+                    bins = np.array([ c_label[int(((len(c_label)-1)/bin_nb)*i)] for i in range(bin_nb)])
+            bin_names = np.arange(bin_nb)
+            digitized = np.digitize(celltypes_labels, bins)
+            binned_label = bin_names[digitized-1]
+
+            np_label = binned_label
+            class_num = np.unique(np_label, return_counts=True)[1].tolist()
+            class_weight = torch.tensor([(1 - (x / sum(class_num))) ** 2 for x in class_num])
+
+        else:
+            np_label = celltypes_labels.to_numpy()
+            class_num = None
+            class_weight = None
+
+        self.class_weight = class_weight
+
+        return np_label,class_num

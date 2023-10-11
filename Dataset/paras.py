@@ -83,6 +83,8 @@ class Dataset_para:
     bin_max:float=None
     save_in_obs:bool=True # save binarize label in obs parameter in anndata
 
+    auto_map_str_labels:bool=True # whether to map string labels to int
+    map_dict:dict=None # map string labels to int
 
     #-> split train test
     n_splits:int=1

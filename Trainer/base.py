@@ -137,7 +137,7 @@ class pl_basic(pl.LightningModule):
         data preprocess
         """
         data, label = batch
-        label = label.squeeze(0)
+        label = label.squeeze(0).type(torch.LongTensor)
         return data, label
 
     def train_post_process(self,logits,label,loss):
@@ -158,7 +158,7 @@ class pl_basic(pl.LightningModule):
         data preprocess
         """
         data, label = batch
-        label = label.squeeze(0)
+        label = label.squeeze(0).type(torch.LongTensor)
         return data, label
 
     def val_post_process(self,logits,label,loss):
@@ -206,6 +206,8 @@ class pl_basic(pl.LightningModule):
         logits = self.model(data)
 
         #---->loss step
+        #debug: change to LongTensor to avoid error
+        label = label.type(torch.LongTensor).to(logits.device)
         loss = self.loss_fn(logits, label)
 
         #---->post process
@@ -224,6 +226,9 @@ class pl_basic(pl.LightningModule):
         logits = self.model(data)
 
         #---->loss step
+        #debug: change to LongTensor to avoid error
+        label = label.type(torch.LongTensor).to(logits.device)
+        #print(logits.type(), label.type())
         loss = self.loss_fn(logits, label)
 
         #---->post process
