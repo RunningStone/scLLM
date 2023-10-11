@@ -1,4 +1,4 @@
-
+import torch
 import torch.nn as nn
 from scLLM.Trainer.base import pl_basic
 from scLLM.Trainer.paras import Trainer_para
@@ -32,7 +32,7 @@ class pl_scBERT(pl_basic):
         data preprocess
         """
         data, label = batch
-        label = label.squeeze(0).float()
+        label = label.squeeze(0)#.float()
         return data, label
 
     def train_post_process(self,logits,label,loss):
@@ -60,7 +60,7 @@ class pl_scBERT(pl_basic):
         data preprocess
         """
         data, label = batch
-        label = label.squeeze(0).float()
+        label = label.squeeze(0)#.type(torch.LongTensor) # <---- Here (casting)
         return data, label
 
     def val_post_process(self,logits,label,loss):
