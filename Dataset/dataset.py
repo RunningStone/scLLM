@@ -39,3 +39,51 @@ class SeqDataset(Dataset):
 
     def __getitem__(self, idx):
         return {k: v[idx] for k, v in self.data.items()}
+    
+
+############################################################
+#               Dataset for scBERT Rank
+############################################################
+import torch
+import numpy as np
+import random
+class SCDatasetRankSample(Dataset):
+    def __init__(self, data, label,thresh):
+        super().__init__()
+        self.data = data
+        self.label = label
+        # 使用torch.unique来确定类别数量
+        unique_labels = torch.unique(label)
+        self.cls_nb = len(unique_labels)
+        self.thresh = thresh
+        # 按类别分组样本的索引
+        self.indices_per_class = {i: np.where(label == i)[0] for i in range(self.cls_nb)}
+
+    def to_tensor(self,full_seq):
+        full_seq = full_seq.toarray()[0]
+        full_seq[full_seq > self.thresh] = self.thresh
+        full_seq = torch.from_numpy(full_seq).long()
+        full_seq = torch.cat((full_seq, torch.tensor([0])))
+        return full_seq
+
+    def __getitem__(self, index):
+        # 选择第一个样本
+        cls_label1 = self.label[index]
+        full_seq1 = self.data[index]
+        full_seq1 = self.to_tensor(full_seq1)
+        # 选择第二个样本，确保其类别不同于第一个样本
+        class_type = [i.item() for i in torch.unique(self.label)]
+        different_classes = list(set(class_type) - {cls_label1.item()})
+        #print(different_classes)
+        cls_label2_idx = random.choice(different_classes)
+        #print(cls_label2_idx)
+        index2 = random.choice(self.indices_per_class[cls_label2_idx])
+        #print(index2)
+        full_seq2 = self.data[index2]
+        full_seq2 = self.to_tensor(full_seq2)
+        cls_label2 = self.label[index2]
+
+        return (full_seq1, full_seq2), (cls_label1, cls_label2)
+
+    def __len__(self):
+        return self.data.shape[0]

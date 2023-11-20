@@ -215,6 +215,7 @@ class pl_basic(pl.LightningModule):
         return out
 
     def training_epoch_end(self, training_step_outputs):
+        #print("#################### train epoch end ####################")
         self.log_train_metrics(training_step_outputs,
             bar_name = self.trainer_paras.metrics_factory.metrics_names[0]+"_train")
 

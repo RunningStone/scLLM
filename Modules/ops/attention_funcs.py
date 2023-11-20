@@ -35,8 +35,9 @@ def softmax_kernel(data, *, projection_matrix, is_query,
 
     projection = repeat(projection_matrix, 'j d -> b h j d', b = b, h = h)
     projection = projection.type_as(data)
-
-    data_dash = torch.einsum('...id,...jd->...ij', (data_normalizer * data), projection)
+    
+    safe_data = data_normalizer * data
+    data_dash = torch.einsum('...id,...jd->...ij', safe_data, projection)
 
     diag_data = data ** 2
     diag_data = torch.sum(diag_data, dim=-1)

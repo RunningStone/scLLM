@@ -20,7 +20,8 @@ class PreLayerNorm(nn.Module):
         self.norm = nn.LayerNorm(dim)
         self.fn = fn
     def forward(self, x, **kwargs):
-        return self.fn(self.norm(x), **kwargs)
+        x = self.norm(x)
+        return self.fn(x, **kwargs)
     
 ##########################################################################
 # DomainSpecificBatchNorm

@@ -41,7 +41,7 @@ class Trainer_para:
     clip_grad: int = int(1e6) # clip gradient
 
     #-----> training
-    max_epochs: int = 100
+    max_epochs: int = 100 # max epochs
 
     #-----> metrics
     metrics_names: list = [] # list of metrics name
