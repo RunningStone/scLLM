@@ -2,7 +2,7 @@ import torch
 from scLLM.Models.scBERT.paras import scBERT_para
 from scLLM.Trainer.paras import Trainer_para
 from scLLM.Models.scBERT.utils import CosineAnnealingWarmupRestarts
-from scLLM.Modules.ops.rank import RankNetLoss
+from scLLM.Modules.customised_loss import RankNetLoss
 
 ####################################################################
 #         trainer paras
@@ -35,11 +35,11 @@ trainer_para.schedulers:list = [CosineAnnealingWarmupRestarts,] # list of schedu
 trainer_para.scheduler_paras:list = [
     # for CosineAnnealingWarmupRestarts
     # aim 100 epochs or higher
-    {"first_cycle_steps":5,
+    {"first_cycle_steps":15,
     "cycle_mult":2,
     "max_lr":1e-4,
     "min_lr":1e-6,
-    "warmup_steps":2,
+    "warmup_steps":5,
     "gamma":0.9,
     }] # list of scheduler paras dict
 
