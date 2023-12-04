@@ -103,3 +103,4 @@ class PerformerLM(nn.Module):
                 return x
             #@ means matrix multiplication __matmul__()
             return x @ self.token_emb.weight.t()
+     
