@@ -87,3 +87,56 @@ class SCDatasetRankSample(Dataset):
 
     def __len__(self):
         return self.data.shape[0]
+    
+############################################################
+#               Dataset for scBERT simple sample
+############################################################
+class SCDatasetRankSimpleSample(Dataset):
+    def __init__(self, data, label,thresh):
+        super().__init__()
+        self.data = data
+        self.label = label
+        # 使用torch.unique来确定类别数量
+        unique_labels = torch.unique(label)
+        self.cls_nb = len(unique_labels)
+        self.thresh = thresh
+        # 按类别分组样本的索引
+        self.indices_per_class = {i: np.where(label == i)[0] for i in range(self.cls_nb)}
+        self.part1 = [0]
+        self.part2 = [4]
+
+    def to_tensor(self,full_seq):
+        full_seq = full_seq.toarray()[0]
+        full_seq[full_seq > self.thresh] = self.thresh
+        full_seq = torch.from_numpy(full_seq).long()
+        full_seq = torch.cat((full_seq, torch.tensor([0])))
+        return full_seq
+
+    def __getitem__(self, index):
+        # 选择第一个样本
+        # 从self.part1中随机选择一个类别
+        class1 = random.choice(self.part1)
+        # 从该类别的索引中随机选择一个样本
+        index1 = random.choice(self.indices_per_class[class1])
+        full_seq1 = self.data[index1]
+        full_seq1 = self.to_tensor(full_seq1)
+        cls_label1 = self.label[index1]
+        # 从self.part2中随机选择一个类别
+        class2 = random.choice(self.part2)
+        # 从该类别的索引中随机选择一个样本
+        index2 = random.choice(self.indices_per_class[class2])
+        #print(index2)
+        full_seq2 = self.data[index2]
+        full_seq2 = self.to_tensor(full_seq2)
+        cls_label2 = self.label[index2]
+
+        return (full_seq1, full_seq2), (cls_label1, cls_label2)
+
+    def __len__(self):
+        # 计算self.part1中所有类别的样本数量
+        count_part1 = sum(len(self.indices_per_class[cls]) for cls in self.part1)
+        # 计算self.part2中所有类别的样本数量
+        count_part2 = sum(len(self.indices_per_class[cls]) for cls in self.part2)
+
+        # 返回所有可能组合的数量
+        return count_part1 * count_part2
