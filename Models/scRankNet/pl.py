@@ -34,7 +34,7 @@ class pl_scBERT_rankNet(pl_basic):
             self.model = MultiNet(transformer,in_dim=self.model_paras.max_seq_len,
                                     dropout=self.model_paras.drop,
                                     h_dim=128,
-                                    out_dim=self.model_paras.out_dim,)
+                                    out_dim=1,)
         else:
             raise ValueError(f"model_type {self.model_paras.model_type} not supported")
         logger.info("init done...")
