@@ -1,5 +1,5 @@
 import torch
-from scLLM.Models.scBERT.paras import scBERT_para
+from scLLM.Models.scRankNet.paras import scRank_para
 from scLLM.Trainer.paras import Trainer_para
 from scLLM.Models.scBERT.utils import CosineAnnealingWarmupRestarts
 from scLLM.Modules.customised_loss import RankNetLoss
@@ -75,25 +75,30 @@ trainer_para.ckpt_format:str = "_{epoch:02d}-{accuracy_val:.2f}" # check_point f
 trainer_para.ckpt_para = { #-----------> paras for pytorch_lightning.callbacks.ModelCheckpoint
                     "save_top_k":1,
                    "monitor":"accuracy_val",}
-
+metrics_multiclass = True
 trainer_para.metrics_paras = {
 "classification":{
-    "accuracy": {"average": "micro","multiclass":True},
+    "accuracy": {"average": "micro","multiclass":metrics_multiclass},
     "cohen_kappa": {},
-    "f1_score": {"average": "macro","multiclass":True},
-    "recall": {"average": "macro","multiclass":True},
-    "precision": {"average": "macro","multiclass":True},
-    "specificity": {"average": "macro","multiclass":True},
+    "f1_score": {"average": "macro","multiclass":metrics_multiclass},
+    "recall": {"average": "macro","multiclass":metrics_multiclass},
+    "precision": {"average": "macro","multiclass":metrics_multiclass},
+    "specificity": {"average": "macro","multiclass":metrics_multiclass},
 
-    "auroc": {"average": "macro","multiclass":True},
-    "roc": {"average": "macro","multiclass":True},
-    "confusion_matrix": {"normalize": "true","multiclass":True},
+    "auroc": {"average": "macro","multiclass":metrics_multiclass},
+    "roc": {"average": "macro","multiclass":metrics_multiclass},
+    "confusion_matrix": {"normalize": "true","multiclass":metrics_multiclass},
 },}
 
 ####################################################################
 #         model paras
 ####################################################################
-model_para = scBERT_para()
+model_para = scRank_para()
+
+model_para.model_name= "scRank"                   # model name
+model_para.model_type = "direct" # ["direct","multiply"]
+model_para.out_dim = 1
+#----> paras for create model architecture
 model_para.num_tokens=5+2                         # num of tokens
 model_para.max_seq_len=16906+1#24447+1              # max length of sequence
 model_para.dim=200                                # dim of tokens
