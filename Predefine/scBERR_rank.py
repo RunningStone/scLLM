@@ -19,7 +19,7 @@ trainer_para.shuffle = False
 trainer_para.num_workers =0
 trainer_para.additional_dataloader_para = {}
 #-----> model
-trainer_para.model_name: str = "scBERT" #"scFormer","scBERT"
+trainer_para.model_name: str = "scRank" # model name
 trainer_para.pre_trained:str = None # pre-trained ckpt location
 
 #-----> optimizer and loss
