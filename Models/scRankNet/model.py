@@ -26,7 +26,7 @@ class MultiNet(nn.Module):
       self.dropout2.requires_grad_(True)
       self.fc3.requires_grad_(True)
 
-    def forward(self, x):
+    def forward(self, x, return_weight = False):
       #print(x.shape)
       x1 = self.model1(x,return_encodings=True)
       #print(x1.shape)
@@ -44,5 +44,8 @@ class MultiNet(nn.Module):
       x2 = self.act2(x2)
       x2 = self.dropout2(x2)
       out = self.fc3(x2)
-      return out
+      if return_weight:
+        return out,x1,x*x1
+      else:
+        return out
     
