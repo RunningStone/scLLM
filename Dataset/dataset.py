@@ -132,7 +132,12 @@ class SCDatasetRankSimpleSample(Dataset):
 
         return (full_seq1, full_seq2), (cls_label1, cls_label2)
 
+    def set_fix_len(self, fix_len:int=5000):
+        self.fix_len = fix_len
+
     def __len__(self):
+        if self.fix_len is not None:
+            return self.fix_len
         # 计算self.part1中所有类别的样本数量
         count_part1 = sum(len(self.indices_per_class[cls]) for cls in self.part1)
         # 计算self.part2中所有类别的样本数量
