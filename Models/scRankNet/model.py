@@ -1,9 +1,11 @@
 
 import torch.nn as nn
 class MultiNet(nn.Module):
-    def __init__(self, Transformer,in_dim, dropout = 0., h_dim = 100, out_dim = 10,):
+    def __init__(self, Transformer,in_dim, dropout = 0., h_dim = 100, out_dim = 10,  out_layer:str="all"):
         super(MultiNet, self).__init__()
         self.model1 = Transformer
+        assert out_layer in ["all","conv1","fc1","fc2",]
+        self.out_layer = out_layer
 
         self.conv1 = nn.Conv2d(1, 1, (1, 200))
         self.act = nn.ReLU()
@@ -34,18 +36,31 @@ class MultiNet(nn.Module):
       x1 = self.conv1(x1)
       x1 = self.act(x1)
       x1 = x1.view(x1.shape[0],-1)
+      if self.out_layer=="conv1":
+        return x1
       #print(x1.shape)
       x2 = x*x1
 
       x2 = self.fc1(x2)
       x2 = self.act1(x2)
       x2 = self.dropout1(x2)
+      if self.out_layer=="fc1":
+        return x2
+
+
       x2 = self.fc2(x2)
       x2 = self.act2(x2)
       x2 = self.dropout2(x2)
+
+      if self.out_layer=="fc2":
+        return x2
+
       out = self.fc3(x2)
-      if return_weight:
-        return out,x1,x*x1
+      if self.out_layer=="all":
+        if return_weight:
+          return out,x1,x*x1
+        else:
+          return out
       else:
-        return out
+        raise ValueError(f"out_layer {self.out_layer} not supported")
     
